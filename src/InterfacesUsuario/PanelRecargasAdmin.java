@@ -125,7 +125,13 @@ public class PanelRecargasAdmin extends JPanel {
             Tema.error(this, "Selecciona una recarga de la lista.");
             return null;
         }
-        return filas.get(fila);
+        String id = String.valueOf(modelo.getValueAt(fila, 0));
+        for (Movimiento m : filas) {
+            if (m.getIdMovimiento().equals(id)) {
+                return m;
+            }
+        }
+        return null;
     }
 
     private void aprobar() {

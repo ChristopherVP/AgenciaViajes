@@ -54,6 +54,16 @@ public final class Tema {
             "¿Cuál fue el primer lugar al que viajaste en bus?"
     };
 
+    /** Preguntas de seguridad serias y personales para las cuentas de administración (también se puede escribir una propia). */
+    public static final String[] PREGUNTAS_ADMIN = {
+            "¿Cómo se llamaba tu primer profesor o profesora?",
+            "¿En qué calle viviste durante tu infancia?",
+            "¿Cuál es el nombre de tu mejor amigo de la infancia?",
+            "¿Cuál fue tu primer trabajo?",
+            "¿Cuál es el segundo nombre de tu padre?",
+            "¿En qué hospital o clínica naciste?"
+    };
+
     private Tema() {
     }
 
@@ -62,6 +72,22 @@ public final class Tema {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception e) {
             // si el aspecto del sistema no está disponible se usa el predeterminado de Java
+        }
+        // letras negras y en negrita en pestañas y encabezados de tablas (con el aspecto de Windows se veían blancas o muy claras)
+        UIManager.put("TabbedPane.foreground", Color.BLACK);
+        UIManager.put("TabbedPane.selectedForeground", Color.BLACK);
+        UIManager.put("TabbedPane.font", fuente(Font.BOLD, 13f));
+        UIManager.put("TableHeader.foreground", Color.BLACK);
+        UIManager.put("TableHeader.font", fuente(Font.BOLD, 13f));
+    }
+
+    /** Pestañas con letra negra y en negrita; si no caben, se desplazan en lugar de apilarse en varias filas. */
+    public static void pestanas(javax.swing.JTabbedPane tabs) {
+        tabs.setFont(fuente(Font.BOLD, 13f));
+        tabs.setForeground(Color.BLACK);
+        tabs.setTabLayoutPolicy(javax.swing.JTabbedPane.SCROLL_TAB_LAYOUT);
+        for (int i = 0; i < tabs.getTabCount(); i++) {
+            tabs.setForegroundAt(i, Color.BLACK);
         }
     }
 
@@ -260,14 +286,29 @@ public final class Tema {
         t.setSelectionBackground(new Color(0xD6E9F8));
         t.setSelectionForeground(TEXTO);
         t.setFillsViewportHeight(true);
+        encabezadoLegible(t);
+    }
+
+    /** Encabezado de tabla con fondo claro y letra negra en negrita, legible con cualquier aspecto del sistema. */
+    public static void encabezadoLegible(JTable t) {
         JTableHeader h = t.getTableHeader();
         h.setFont(fuente(Font.BOLD, 13f));
-        h.setBackground(AZUL_OSCURO);
-        h.setForeground(Color.WHITE);
         h.setReorderingAllowed(false);
-        DefaultTableCellRenderer izquierda = new DefaultTableCellRenderer();
-        izquierda.setHorizontalAlignment(SwingConstants.LEFT);
-        ((DefaultTableCellRenderer) h.getDefaultRenderer()).setHorizontalAlignment(SwingConstants.LEFT);
+        h.setDefaultRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable tb, Object valor, boolean sel, boolean foco, int fila, int col) {
+                super.getTableCellRendererComponent(tb, valor, false, false, fila, col);
+                setOpaque(true);
+                setBackground(new Color(0xDCE8F2));
+                setForeground(Color.BLACK);
+                setFont(fuente(Font.BOLD, 13f));
+                setHorizontalAlignment(SwingConstants.LEFT);
+                setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 2, 1, new Color(0x9AAAB8)),
+                        BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+                return this;
+            }
+        });
+        h.setPreferredSize(new Dimension(h.getPreferredSize().width, 32));
     }
 
     /** Muestra debajo de un campo de contraseña si es débil, media o fuerte mientras se escribe. */

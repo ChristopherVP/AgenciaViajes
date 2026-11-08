@@ -58,15 +58,12 @@ public class SplashRQ extends JWindow {
 
     public SplashRQ(Runnable alTerminar) {
         this.alTerminar = alTerminar;
-        setSize(ANCHO, ALTO);
-        setLocationRelativeTo(null);
+        // pantalla completa desde el primer momento: la tarjeta del logo se dibuja centrada y escalada
+        java.awt.Dimension pantalla = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
+        setSize(pantalla);
+        setLocation(0, 0);
         setContentPane(lienzo);
         setIconImage(logo);
-        try {
-            setShape(new RoundRectangle2D.Float(0, 0, ANCHO, ALTO, 28, 28));
-        } catch (UnsupportedOperationException e) {
-            // plataformas sin ventanas con forma: se muestra rectangular
-        }
     }
 
     public void iniciar() {
@@ -140,11 +137,16 @@ public class SplashRQ extends JWindow {
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         long ahora = System.currentTimeMillis();
 
-        g.setPaint(new GradientPaint(0, 0, Tema.AZUL_OSCURO, ANCHO, ALTO, new Color(0x1B6CA8)));
-        g.fillRect(0, 0, ANCHO, ALTO);
+        int total_w = lienzo.getWidth();
+        int total_h = lienzo.getHeight();
+        g.setPaint(new GradientPaint(0, 0, Tema.AZUL_OSCURO, total_w, total_h, new Color(0x1B6CA8)));
+        g.fillRect(0, 0, total_w, total_h);
         g.setColor(new Color(255, 255, 255, 14));
         g.fillOval(-120, -140, 380, 380);
-        g.fillOval(ANCHO - 260, ALTO - 220, 420, 420);
+        g.fillOval(total_w - 300, total_h - 260, 460, 460);
+        double escalaTarjeta = Math.max(1.0, Math.min(total_w / (double) ANCHO, total_h / (double) ALTO) * 0.78);
+        g.translate((total_w - ANCHO * escalaTarjeta) / 2, (total_h - ALTO * escalaTarjeta) / 2);
+        g.scale(escalaTarjeta, escalaTarjeta);
 
         float escala = 0.82f + 0.18f * alfaLogo;
         int lado = (int) (170 * escala);

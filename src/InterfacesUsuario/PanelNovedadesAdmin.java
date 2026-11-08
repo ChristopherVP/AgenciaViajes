@@ -26,7 +26,7 @@ public class PanelNovedadesAdmin extends JPanel {
     private final ControladorNovedades controlador = new ControladorNovedades();
     private final Usuario actor;
     private final JComboBox<String> cmbFiltro = new JComboBox<>(new String[]{"Sin resolver", "Todos", "Resueltos"});
-    private final DefaultTableModel modelo = new DefaultTableModel(new String[]{"ID", "Fecha", "Conductor", "Viaje", "Tipo", "Asunto", "Estado"}, 0) {
+    private final DefaultTableModel modelo = new DefaultTableModel(new String[]{"ID", "Fecha", "Remitente", "Viaje", "Tipo", "Asunto", "Estado"}, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
             return false;
@@ -95,12 +95,25 @@ public class PanelNovedadesAdmin extends JPanel {
         }
     }
 
+    /** La tabla puede estar filtrada por la barra de búsqueda, así que la novedad se busca por su ID y no por la posición. */
+    private Novedad novedadDeFila(int fila) {
+        if (fila < 0 || fila >= modelo.getRowCount()) {
+            return null;
+        }
+        String id = String.valueOf(modelo.getValueAt(fila, 0));
+        for (Novedad n : filas) {
+            if (n.getIdNovedad().equals(id)) {
+                return n;
+            }
+        }
+        return null;
+    }
+
     private void mostrarDetalle() {
-        int fila = tabla.getSelectedRow();
-        if (fila < 0 || fila >= filas.size()) {
+        Novedad n = novedadDeFila(tabla.getSelectedRow());
+        if (n == null) {
             return;
         }
-        Novedad n = filas.get(fila);
         detalle.setText(n.getAsunto() + "\n\n" + n.getMensaje() + "\n\n"
                 + (n.getRespuesta() == null || n.getRespuesta().isEmpty() ? "(Sin respuesta todavía)" : "Respuesta enviada:\n" + n.getRespuesta()));
         detalle.setCaretPosition(0);
@@ -112,8 +125,11 @@ public class PanelNovedadesAdmin extends JPanel {
             Tema.error(this, "Selecciona un reporte de la lista.");
             return;
         }
-        Novedad n = filas.get(fila);
-        String respuesta = JOptionPane.showInputDialog(this, "Respuesta para el conductor (5 a 200 caracteres):", "Responder reporte", JOptionPane.QUESTION_MESSAGE);
+        Novedad n = novedadDeFila(fila);
+        if (n == null) {
+            return;
+        }
+        String respuesta = JOptionPane.showInputDialog(this, "Respuesta para quien envió el reporte (5 a 200 caracteres):", "Responder reporte", JOptionPane.QUESTION_MESSAGE);
         if (respuesta == null) {
             return;
         }

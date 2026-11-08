@@ -43,9 +43,7 @@ public class DialogoFormularioPasajero extends JDialog {
     private JTextField txtTelefono;
     private JTextField txtEmail;
     private JTextField txtDireccion;
-    private JTextField txtDiaNac;
-    private JTextField txtMesNac;
-    private JTextField txtAnioNac;
+    private SelectorFecha selNac;
     private JLabel lblTipoPasajero;
     private JCheckBox chkDiscapacidad;
     private JComboBox<String> cmbEmpresa;
@@ -130,21 +128,11 @@ public class DialogoFormularioPasajero extends JDialog {
         gbc.gridx = 0;
         gbc.gridy = 6;
         panel.add(new JLabel("Fecha Nacimiento:"), gbc);
-        JPanel pFecha = new JPanel(new FlowLayout(0));
-        this.txtDiaNac = new JTextField(2);
-        this.txtMesNac = new JTextField(2);
-        this.txtAnioNac = new JTextField(4);
-        pFecha.add(this.txtDiaNac);
-        pFecha.add(new JLabel("/"));
-        pFecha.add(this.txtMesNac);
-        pFecha.add(new JLabel("/"));
-        pFecha.add(this.txtAnioNac);
-        DocumentListener dateListener = new SimpleDocumentListener(() -> this.actualizarTipoPasajero());
-        this.txtDiaNac.getDocument().addDocumentListener(dateListener);
-        this.txtMesNac.getDocument().addDocumentListener(dateListener);
-        this.txtAnioNac.getDocument().addDocumentListener(dateListener);
+        int anioActual = java.time.LocalDate.now().getYear();
+        this.selNac = new SelectorFecha(anioActual, anioActual - 110, false);
+        this.selNac.alCambiar(() -> this.actualizarTipoPasajero());
         gbc.gridx = 1;
-        panel.add(pFecha, gbc);
+        panel.add(this.selNac, gbc);
         gbc.gridx = 0;
         gbc.gridy = 7;
         panel.add(new JLabel("Discapacidad:"), gbc);
@@ -209,11 +197,13 @@ public class DialogoFormularioPasajero extends JDialog {
             this.lblTipoPasajero.setText("DISCAPACITADO");
         } else {
             try {
-                int d = Integer.parseInt(this.txtDiaNac.getText().trim());
-                int m = Integer.parseInt(this.txtMesNac.getText().trim());
-                int a = Integer.parseInt(this.txtAnioNac.getText().trim());
+                Fecha nacimiento = this.selNac.getFecha();
+                if (nacimiento == null) {
+                    this.lblTipoPasajero.setText("ADULTO (Por defecto)");
+                    return;
+                }
                 Pasajero temp = new Pasajero();
-                temp.setFechaNacimiento(new Fecha(d, m, a));
+                temp.setFechaNacimiento(nacimiento);
                 temp.setDiscapacidad(false);
                 JLabel var10000 = this.lblTipoPasajero;
                 String var10001 = temp.getTipoPasajero();
@@ -233,9 +223,7 @@ public class DialogoFormularioPasajero extends JDialog {
         this.txtEmail.setText(this.pasajero.getEmail());
         this.txtDireccion.setText(this.pasajero.getDireccion());
         if (this.pasajero.getFechaNacimiento() != null) {
-            this.txtDiaNac.setText("" + this.pasajero.getFechaNacimiento().getDia());
-            this.txtMesNac.setText("" + this.pasajero.getFechaNacimiento().getMes());
-            this.txtAnioNac.setText("" + this.pasajero.getFechaNacimiento().getAnio());
+            this.selNac.setFecha(this.pasajero.getFechaNacimiento());
         }
 
         this.chkDiscapacidad.setSelected(this.pasajero.isDiscapacidad());
@@ -307,12 +295,9 @@ public class DialogoFormularioPasajero extends JDialog {
                             this.pasajero.setEmail(email);
                             this.pasajero.setDireccion(this.txtDireccion.getText().trim());
 
-                            try {
-                                int d = Integer.parseInt(this.txtDiaNac.getText());
-                                int m = Integer.parseInt(this.txtMesNac.getText());
-                                int a = Integer.parseInt(this.txtAnioNac.getText());
-                                this.pasajero.setFechaNacimiento(new Fecha(d, m, a));
-                            } catch (Exception var9) {
+                            Fecha nacimientoElegido = this.selNac.getFecha();
+                            if (nacimientoElegido != null) {
+                                this.pasajero.setFechaNacimiento(nacimientoElegido);
                             }
 
                             this.pasajero.setDiscapacidad(this.chkDiscapacidad.isSelected());

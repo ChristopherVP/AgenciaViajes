@@ -35,7 +35,6 @@ public class PanelGestionUsuarios extends JPanel {
     private final ControladorUsuarios controlador = new ControladorUsuarios();
     private final Usuario usuarioActual;
     private final String tipoFiltro;
-    private final JTextField txtBuscar = Tema.campo(18);
     private final JLabel lblResumen = Tema.etiqueta(" ");
     private final DefaultTableModel modelo = new DefaultTableModel(new String[]{"ID", "Usuario", "Nombre", "Cédula", "Correo", "Rol", "Cargo", "Empresa", "Estado"}, 0) {
         @Override
@@ -56,31 +55,26 @@ public class PanelGestionUsuarios extends JPanel {
         boolean esAdmin = usuario != null && usuario.getRol() == Rol.ADMINISTRADOR;
         JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         arriba.setOpaque(false);
-        javax.swing.JButton agregar = Tema.boton("Agregar", true);
+        javax.swing.JButton agregar = Tema.boton("Nuevo administrador", true);
         javax.swing.JButton editar = Tema.boton("Editar", false);
         javax.swing.JButton eliminar = Tema.boton("Eliminar", false);
-        javax.swing.JButton aprobar = Tema.boton("Aprobar cuenta", false);
+        javax.swing.JButton aprobar = Tema.boton("Revisar solicitud", false);
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         agregar.addActionListener(e -> nuevo());
         editar.addActionListener(e -> editar());
         eliminar.addActionListener(e -> eliminar());
         aprobar.addActionListener(e -> aprobar());
         actualizar.addActionListener(e -> cargarDatos());
-        for (javax.swing.JButton b : new javax.swing.JButton[]{agregar, editar, eliminar, aprobar}) {
+        for (javax.swing.JButton b : new javax.swing.JButton[]{editar, eliminar, aprobar}) {
             b.setEnabled(esAdmin);
         }
+        // solo el administrador principal crea administradores; pasajeros y conductores se registran solos
+        agregar.setEnabled(esAdmin && usuario.esAdministradorPrincipal());
         arriba.add(agregar);
         arriba.add(editar);
         arriba.add(eliminar);
         arriba.add(aprobar);
         arriba.add(actualizar);
-        arriba.add(Tema.etiqueta("Buscar"));
-        arriba.add(txtBuscar);
-        txtBuscar.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { cargarDatos(); }
-            public void removeUpdate(DocumentEvent e) { cargarDatos(); }
-            public void changedUpdate(DocumentEvent e) { cargarDatos(); }
-        });
         add(arriba, BorderLayout.NORTH);
 
         Tema.tabla(tabla);
@@ -114,14 +108,9 @@ public class PanelGestionUsuarios extends JPanel {
             for (Empresa e : new Empresas("empresas.dat").lista()) {
                 empresas.put(e.getIdEmpresa(), e.getNombre());
             }
-            String q = txtBuscar.getText().trim().toLowerCase();
             int pendientes = 0;
             for (Usuario u : controlador.listarVisibles(usuarioActual)) {
                 if (tipoFiltro != null && !tipoFiltro.equalsIgnoreCase(u.getTipo())) {
-                    continue;
-                }
-                String texto = (u.getIdUsuario() + " " + u.getLogin() + " " + u.getNombre() + " " + u.getCedula() + " " + u.getEmail()).toLowerCase();
-                if (!q.isEmpty() && !texto.contains(q)) {
                     continue;
                 }
                 filas.add(u);
@@ -152,7 +141,13 @@ public class PanelGestionUsuarios extends JPanel {
             Tema.error(this, "Selecciona un usuario de la lista.");
             return null;
         }
-        return filas.get(fila);
+        String id = String.valueOf(modelo.getValueAt(fila, 0));
+        for (Usuario u : filas) {
+            if (u.getIdUsuario().equals(id)) {
+                return u;
+            }
+        }
+        return null;
     }
 
     private void nuevo() {
@@ -180,6 +175,14 @@ public class PanelGestionUsuarios extends JPanel {
     private void aprobar() {
         Usuario u = seleccionado();
         if (u == null) return;
+        if (!Usuario.ESTADO_PENDIENTE.equalsIgnoreCase(u.getEstado())) {
+            Tema.error(this, "Solo se revisan solicitudes en estado PENDIENTE. Selecciona una cuenta pendiente.");
+            return;
+        }
+        if (u.getRol() == objetosNegocio.Rol.CONDUCTOR) {
+            new DialogoRevisionConductor(javax.swing.SwingUtilities.getWindowAncestor(this), usuarioActual, u, this::cargarDatos).setVisible(true);
+            return;
+        }
         ResultadoOperacion r = controlador.aprobarUsuario(usuarioActual, u.getIdUsuario());
         if (!r.isExito()) Tema.error(this, r.getMensaje()); else Tema.info(this, r.getMensaje());
         cargarDatos();

@@ -2,6 +2,7 @@ package control;
 
 import excepciones.PersistenciaException;
 import excepciones.Validador;
+import java.io.File;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.Period;
@@ -17,6 +18,7 @@ import objetosNegocio.Pasajero;
 import objetosNegocio.Rol;
 import objetosNegocio.Usuario;
 import objetosServicio.ConfiguracionAdmin;
+import objetosServicio.DocumentosConductor;
 import objetosServicio.Fecha;
 import objetosServicio.Seguridad;
 import persistencia.Conductores;
@@ -168,38 +170,118 @@ public class ControladorUsuarios {
      * Un conductor solo puede crear su cuenta si el administrador/empresa ya lo registró como conductor
      * (se busca por cédula). La cuenta queda PENDIENTE hasta que un administrador la apruebe.
      */
-    public synchronized ResultadoOperacion registrarConductor(String login, String cedula, String clave, String confirmar,
-                                                              String email, String telefono, String pregunta, String respuesta) {
+    /**
+     * Registro de un conductor que se inscribe por su cuenta. Elige la empresa en la que quiere trabajar, declara su
+     * licencia y adjunta sus documentos (cédula, licencia, antecedentes). La cuenta queda PENDIENTE: un administrador
+     * debe revisar los documentos y aprobarla antes de que pueda ingresar y trabajar para esa empresa.
+     */
+    public synchronized ResultadoOperacion registrarConductor(String login, String nombre, String cedula, Fecha nacimiento, String clave,
+                                                              String confirmar, String email, String telefono, String idEmpresa,
+                                                              String tipoLicencia, String numeroLicencia, Fecha venceLicencia,
+                                                              Map<DocumentosConductor.Tipo, File> documentos, String pregunta, String respuesta) {
         try {
-            String errCedula = Validador.errorCedula(cedula);
-            if (errCedula != null) {
-                return error(errCedula);
+            String problema = validarCuenta(login, nombre, cedula, clave, confirmar, email, telefono, pregunta, respuesta, true, null, true);
+            if (problema == null) problema = validarMayorDeEdad(nacimiento);
+            String idEmp = idEmpresa == null ? "" : idEmpresa.trim();
+            if (problema == null && (idEmp.isEmpty() || empresas.obten(new Empresa(idEmp)) == null)) {
+                problema = "Elige la empresa en la que vas a trabajar";
             }
-            Conductor ficha = buscarConductorPorCedula(cedula.trim());
-            if (ficha == null) {
-                return error("No existe un conductor registrado con esa cédula. Pide a tu empresa o al administrador que te registre primero.");
+            String tipo = tipoLicencia == null ? "" : tipoLicencia.trim().toUpperCase();
+            if (problema == null && !tipo.equals("D") && !tipo.equals("E")) {
+                problema = "Para conducir buses interprovinciales necesitas licencia profesional tipo D o E";
             }
-            if ("INACTIVO".equalsIgnoreCase(ficha.getEstado())) {
-                return error("Tu ficha de conductor está inactiva. Contacta al administrador.");
+            String numero = numeroLicencia == null ? "" : numeroLicencia.trim().toUpperCase();
+            if (problema == null && !numero.matches("[A-Z0-9]{6,12}")) {
+                problema = "El número de licencia debe tener entre 6 y 12 letras o números";
             }
-            for (Usuario existente : usuarios.lista()) {
-                if (ficha.getIdConductor().equals(existente.getIdPerfil())) {
-                    return error("Ese conductor ya tiene una cuenta creada.");
+            if (problema == null) problema = errorVencimientoLicencia(venceLicencia);
+            if (problema == null) {
+                for (DocumentosConductor.Tipo t : DocumentosConductor.Tipo.values()) {
+                    File f = documentos == null ? null : documentos.get(t);
+                    if (f == null) {
+                        if (t.esObligatorio()) {
+                            problema = "Falta adjuntar: " + t.getEtiqueta();
+                            break;
+                        }
+                        continue;
+                    }
+                    String errorDoc = DocumentosConductor.errorArchivo(f);
+                    if (errorDoc != null) {
+                        problema = t.getEtiqueta() + ": " + errorDoc;
+                        break;
+                    }
                 }
             }
-            String problema = validarCuenta(login, ficha.getNombre(), cedula, clave, confirmar, email, telefono, pregunta, respuesta, true, "conductor", true);
             if (problema != null) {
                 return error(problema);
             }
-            Usuario u = nuevoUsuario(login, ficha.getNombre(), cedula, clave, email, telefono, Rol.CONDUCTOR, Usuario.ESTADO_PENDIENTE);
-            u.setEmpresa(ficha.getEmpresa());
-            u.setIdPerfil(ficha.getIdConductor());
-            u.setPreguntaSeguridad(pregunta.trim());
-            u.definirRespuestaSeguridad(respuesta);
-            usuarios.agrega(u);
-            return ok("Solicitud enviada. Un administrador debe aprobar tu cuenta antes de que puedas ingresar.", u);
+            String ced = cedula.trim();
+            Conductor ficha = buscarConductorPorCedula(ced);
+            if (ficha != null) {
+                if (ficha.getEmpresa() == null || !idEmp.equals(ficha.getEmpresa().getIdEmpresa())) {
+                    return error("Esa cédula ya está registrada como conductor de otra empresa. Contacta al administrador.");
+                }
+                for (Usuario existente : usuarios.lista()) {
+                    if (ficha.getIdConductor().equals(existente.getIdPerfil())) {
+                        return error("Ese conductor ya tiene una cuenta creada.");
+                    }
+                }
+            }
+            try {
+                for (Map.Entry<DocumentosConductor.Tipo, File> e : documentos.entrySet()) {
+                    DocumentosConductor.guardar(ced, e.getKey(), e.getValue());
+                }
+                java.util.Properties datos = new java.util.Properties();
+                datos.setProperty("nombre", nombre.trim());
+                datos.setProperty("nacimiento", String.format("%02d/%02d/%04d", nacimiento.getDia(), nacimiento.getMes(), nacimiento.getAnio()));
+                datos.setProperty("licenciaTipo", tipo);
+                datos.setProperty("licenciaNumero", numero);
+                datos.setProperty("licenciaVence", String.format("%02d/%02d/%04d", venceLicencia.getDia(), venceLicencia.getMes(), venceLicencia.getAnio()));
+                DocumentosConductor.guardarDatos(ced, datos);
+            } catch (java.io.IOException | RuntimeException ex) {
+                return error("No se pudieron guardar tus documentos: " + ex.getMessage());
+            }
+            boolean fichaNueva = ficha == null;
+            if (fichaNueva) {
+                // la ficha queda INACTIVA hasta que el administrador apruebe la cuenta
+                ficha = new Conductor("", nombre.trim(), ced, telefono.trim(), tipo + "-" + numero, "INACTIVO", new Empresa(idEmp));
+                conductores.agrega(ficha);
+            }
+            try {
+                Usuario u = nuevoUsuario(login, nombre.trim(), ced, clave, email, telefono, Rol.CONDUCTOR, Usuario.ESTADO_PENDIENTE);
+                u.setEmpresa(new Empresa(idEmp));
+                u.setIdPerfil(ficha.getIdConductor());
+                u.setPreguntaSeguridad(pregunta.trim());
+                u.definirRespuestaSeguridad(respuesta);
+                usuarios.agrega(u);
+                return ok("Solicitud enviada. El administrador revisará tus documentos y aprobará tu cuenta antes de que puedas ingresar.", u);
+            } catch (PersistenciaException e) {
+                if (fichaNueva) {
+                    conductores.elimina(ficha);
+                }
+                throw e;
+            }
         } catch (PersistenciaException e) {
             return error(e.getMessage());
+        }
+    }
+
+    /** La licencia debe seguir vigente al menos 30 días y no puede vencer en más de 10 años. */
+    private String errorVencimientoLicencia(Fecha vence) {
+        if (vence == null) {
+            return "Indica cuándo vence tu licencia";
+        }
+        try {
+            LocalDate fecha = LocalDate.of(vence.getAnio(), vence.getMes(), vence.getDia());
+            if (fecha.isBefore(LocalDate.now().plusDays(30))) {
+                return "Tu licencia está vencida o vence en menos de 30 días: renuévala antes de registrarte";
+            }
+            if (fecha.isAfter(LocalDate.now().plusYears(10))) {
+                return "La fecha de vencimiento de la licencia no es válida";
+            }
+            return null;
+        } catch (DateTimeException e) {
+            return "La fecha de vencimiento de la licencia no es válida";
         }
     }
 
@@ -553,9 +635,73 @@ public class ControladorUsuarios {
             if (!Usuario.ESTADO_PENDIENTE.equalsIgnoreCase(objetivo.getEstado())) {
                 return error("Solo se pueden aprobar cuentas en estado PENDIENTE");
             }
+            if (objetivo.getRol() == Rol.CONDUCTOR) {
+                if (!DocumentosConductor.completos(objetivo.getCedula())) {
+                    return error("El conductor no tiene todos los documentos obligatorios; no se puede aprobar");
+                }
+                Conductor ficha = conductores.obten(new Conductor(objetivo.getIdPerfil()));
+                if (ficha != null) {
+                    ficha.setEstado("ACTIVO");
+                    conductores.actualiza(ficha);
+                }
+            }
             objetivo.setEstado(Usuario.ESTADO_ACTIVO);
             usuarios.actualiza(objetivo);
             return ok("Cuenta aprobada: " + objetivo.getNombre(), objetivo);
+        } catch (PersistenciaException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /** Rechaza una solicitud pendiente (por ejemplo, documentos incompletos o vencidos): la cuenta queda INACTIVA. */
+    public synchronized ResultadoOperacion rechazarUsuario(Usuario actor, String idUsuario) {
+        try {
+            Usuario objetivo = usuarios.obtenPorIdUsuario(idUsuario);
+            ResultadoOperacion permiso = verificarAlcance(actor, objetivo);
+            if (!permiso.isExito()) {
+                return permiso;
+            }
+            if (!Usuario.ESTADO_PENDIENTE.equalsIgnoreCase(objetivo.getEstado())) {
+                return error("Solo se pueden rechazar cuentas en estado PENDIENTE");
+            }
+            objetivo.setEstado(Usuario.ESTADO_INACTIVO);
+            usuarios.actualiza(objetivo);
+            return ok("Solicitud rechazada: " + objetivo.getNombre(), objetivo);
+        } catch (PersistenciaException e) {
+            return error(e.getMessage());
+        }
+    }
+
+    /**
+     * Primer ingreso de una cuenta con contraseña temporal: guarda la pregunta de seguridad personal (para recuperar la
+     * contraseña) y, si la cuenta tiene la cédula reservada del administrador principal, la cédula real.
+     */
+    public synchronized ResultadoOperacion completarCuentaInicial(String idUsuario, String cedula, String pregunta, String respuesta) {
+        try {
+            Usuario u = usuarios.obtenPorIdUsuario(idUsuario);
+            if (u == null) {
+                return error("Usuario no encontrado");
+            }
+            boolean cedulaPendiente = ConfiguracionAdmin.CEDULA_RESERVADA.equals(u.getCedula());
+            String problema = null;
+            if (cedulaPendiente) {
+                problema = Validador.errorCedula(cedula);
+                if (problema == null && usuarios.buscaPorCedula(cedula.trim()) != null) {
+                    problema = "Ya existe una cuenta con esa cédula";
+                }
+            }
+            if (problema == null) problema = Validador.errorPreguntaSeguridad(pregunta);
+            if (problema == null) problema = Validador.errorRespuestaSeguridad(respuesta);
+            if (problema != null) {
+                return error(problema);
+            }
+            if (cedulaPendiente) {
+                u.setCedula(cedula.trim());
+            }
+            u.setPreguntaSeguridad(pregunta.trim());
+            u.definirRespuestaSeguridad(respuesta);
+            usuarios.actualiza(u);
+            return ok("Datos de seguridad guardados", u);
         } catch (PersistenciaException e) {
             return error(e.getMessage());
         }

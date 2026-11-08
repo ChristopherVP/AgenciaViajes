@@ -36,6 +36,17 @@ public class ControladorNovedades {
         TIPOS.put("INCIDENTE_RUTA", "Incidente en la ruta");
         TIPOS.put("QUEJA", "Queja o reclamo");
         TIPOS.put("OTRO", "Otro asunto");
+        TIPOS.put("SUGERENCIA", "Sugerencia");
+        TIPOS.put("PROBLEMA_PAGO", "Problema con un pago o recarga");
+    }
+
+    /** Tipos que puede elegir un pasajero al escribir al administrador. */
+    public static final Map<String, String> TIPOS_PASAJERO = new LinkedHashMap<>();
+    static {
+        TIPOS_PASAJERO.put("QUEJA", "Queja o reclamo");
+        TIPOS_PASAJERO.put("SUGERENCIA", "Sugerencia");
+        TIPOS_PASAJERO.put("PROBLEMA_PAGO", "Problema con un pago o recarga");
+        TIPOS_PASAJERO.put("OTRO", "Otro asunto");
     }
 
     private final Novedades novedades;
@@ -55,10 +66,12 @@ public class ControladorNovedades {
     }
 
     public synchronized ResultadoOperacion reportar(Usuario actor, String idViaje, String tipo, String asunto, String mensaje) {
-        if (actor == null || actor.getRol() != Rol.CONDUCTOR || !actor.estaActivo() || actor.getIdPerfil() == null || actor.getIdPerfil().isEmpty()) {
-            return new ResultadoOperacion(false, "Solo los conductores pueden enviar reportes al administrador");
+        boolean esConductor = actor != null && actor.getRol() == Rol.CONDUCTOR;
+        boolean esPasajero = actor != null && actor.getRol() == Rol.PASAJERO;
+        if (actor == null || !(esConductor || esPasajero) || !actor.estaActivo() || actor.getIdPerfil() == null || actor.getIdPerfil().isEmpty()) {
+            return new ResultadoOperacion(false, "Solo los conductores y los pasajeros pueden enviar reportes al administrador");
         }
-        if (tipo == null || !TIPOS.containsKey(tipo)) {
+        if (tipo == null || !(esPasajero ? TIPOS_PASAJERO : TIPOS).containsKey(tipo)) {
             return new ResultadoOperacion(false, "Selecciona el tipo de reporte");
         }
         String a = asunto == null ? "" : asunto.trim();
@@ -71,7 +84,7 @@ public class ControladorNovedades {
         }
         try {
             String viajeFinal = "";
-            if (idViaje != null && !idViaje.trim().isEmpty()) {
+            if (esConductor && idViaje != null && !idViaje.trim().isEmpty()) {
                 Viaje v = viajes.obten(new Viaje(idViaje.trim()));
                 if (v == null || !esConductorDelViaje(v, actor.getIdPerfil())) {
                     return new ResultadoOperacion(false, "Ese viaje no está asignado a tu cuenta");
@@ -102,6 +115,20 @@ public class ControladorNovedades {
         }
     }
 
+    /** Reportes enviados por la persona (conductor o pasajero), del más reciente al más antiguo. */
+    public synchronized ResultadoOperacion listarMios(Usuario actor) {
+        if (actor == null || (actor.getRol() != Rol.CONDUCTOR && actor.getRol() != Rol.PASAJERO)) {
+            return new ResultadoOperacion(false, "Acción no permitida");
+        }
+        try {
+            List<Novedad> lista = novedades.lista().stream().filter(n -> actor.getIdPerfil().equals(n.getIdConductor()))
+                    .sorted(ordenReciente()).collect(Collectors.toList());
+            return new ResultadoOperacion(true, "OK", lista);
+        } catch (PersistenciaException e) {
+            return new ResultadoOperacion(false, e.getMessage());
+        }
+    }
+
     public synchronized ResultadoOperacion listarDeConductor(Usuario actor) {
         if (actor == null || actor.getRol() != Rol.CONDUCTOR) {
             return new ResultadoOperacion(false, "Acción no permitida");
@@ -127,6 +154,7 @@ public class ControladorNovedades {
             }
             List<Novedad> lista = new ArrayList<>();
             for (Novedad n : novedades.lista()) {
+                // los reportes de pasajeros no pertenecen a una empresa: los ve el administrador general
                 if (actor.esSuperAdministrador() || perteneceAEmpresa(porId.get(n.getIdConductor()), actor)) {
                     lista.add(n);
                 }
@@ -189,11 +217,15 @@ public class ControladorNovedades {
         return new ArrayList<>(correos);
     }
 
+    /** Id de conductor o de pasajero -> nombre, para mostrar quién envió cada reporte. */
     public Map<String, String> nombresDeConductores() {
         Map<String, String> mapa = new LinkedHashMap<>();
         try {
             for (Conductor c : conductores.lista()) {
                 mapa.put(c.getIdConductor(), c.getNombre());
+            }
+            for (objetosNegocio.Pasajero p : new persistencia.Pasajeros("pasajeros.dat").lista()) {
+                mapa.put(p.getIdPasajero(), p.getNombre());
             }
         } catch (PersistenciaException ignorado) {
             // se mostrará el id

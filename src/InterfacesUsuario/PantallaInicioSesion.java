@@ -34,13 +34,20 @@ public class PantallaInicioSesion extends JFrame {
         setTitle("RQ - Iniciar sesión");
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
-        add(crearPanelMarca(), BorderLayout.WEST);
-        add(crearFormulario(), BorderLayout.CENTER);
-        setPreferredSize(new Dimension(860, 520));
+        // pantalla completa: marca a la izquierda y formulario centrado a la derecha
+        JPanel raiz = new JPanel(new java.awt.GridLayout(1, 2));
+        raiz.add(crearPanelMarca());
+        JPanel derecha = new JPanel(new GridBagLayout());
+        derecha.setBackground(Color.WHITE);
+        JPanel formulario = crearFormulario();
+        formulario.setPreferredSize(new Dimension(520, 640));
+        derecha.add(formulario);
+        raiz.add(derecha);
+        setContentPane(raiz);
+        setMinimumSize(new Dimension(860, 600));
         pack();
         setLocationRelativeTo(null);
-        setResizable(false);
+        setExtendedState(MAXIMIZED_BOTH);
     }
 
     private JPanel crearPanelMarca() {

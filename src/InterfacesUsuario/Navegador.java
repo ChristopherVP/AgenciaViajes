@@ -44,6 +44,7 @@ public final class Navegador {
             ventana = new PantallaPrincipal(usuario);
         }
         ventana.setIconImage(IconoRQ.crear(64));
+        ventana.setExtendedState(JFrame.MAXIMIZED_BOTH);
         ventana.setVisible(true);
         if (!usuario.tienePreguntaSeguridad()) {
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(ventana,
@@ -52,7 +53,14 @@ public final class Navegador {
         }
     }
 
+    /** Pide confirmación antes de cerrar la sesión (evita salir por un clic accidental). */
     public static void cerrarSesion(Window actual) {
+        Object[] opciones = {"Sí, cerrar sesión", "Cancelar"};
+        int respuesta = JOptionPane.showOptionDialog(actual, "¿Seguro que quieres cerrar tu sesión?\nLo que no hayas guardado se perderá.",
+                "Cerrar sesión", JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[1]);
+        if (respuesta != 0) {
+            return;
+        }
         if (actual != null) {
             actual.dispose();
         }
@@ -62,6 +70,8 @@ public final class Navegador {
     /** Copia en "destino" los datos actualizados de la cuenta para que la ventana abierta los refleje. */
     public static void refrescar(Usuario destino, Usuario fuente) {
         destino.setNombre(fuente.getNombre());
+        destino.setCedula(fuente.getCedula());
+        destino.setCargo(fuente.getCargo());
         destino.setEmail(fuente.getEmail());
         destino.setTelefono(fuente.getTelefono());
         destino.setContrasena(fuente.getContrasena());

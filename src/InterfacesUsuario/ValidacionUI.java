@@ -108,6 +108,48 @@ public final class ValidacionUI {
         });
     }
 
+    /** Monto en dólares: dígitos y un solo punto (la coma se cambia por punto), máximo 2 decimales. */
+    public static void monto(JTextField campo, int max) {
+        filtrar(campo, t -> {
+            String s = t.replace(',', '.').replaceAll("[^0-9.]", "");
+            int punto = s.indexOf('.');
+            if (punto >= 0) {
+                if (s.indexOf('.', punto + 1) >= 0) {
+                    return null;
+                }
+                if (s.length() - punto - 1 > 2) {
+                    s = s.substring(0, punto + 3);
+                }
+            }
+            return recortar(s, max);
+        });
+    }
+
+    /** Número de tarjeta: solo dígitos (máximo 19) mostrados en grupos de 4. */
+    public static void tarjeta(JTextField campo) {
+        filtrar(campo, t -> {
+            String d = recortar(t.replaceAll("\\D", ""), 19);
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < d.length(); i++) {
+                if (i > 0 && i % 4 == 0) {
+                    sb.append(' ');
+                }
+                sb.append(d.charAt(i));
+            }
+            return sb.toString();
+        });
+    }
+
+    /** Titular de tarjeta: letras y espacios en mayúsculas, como se imprime en la tarjeta. */
+    public static void titular(JTextField campo, int max) {
+        filtrar(campo, t -> recortar(t.replaceAll("[^\\p{L} ]", "").replaceAll(" {2,}", " ").replaceAll("^ ", "").toUpperCase(), max));
+    }
+
+    /** Letras sin tilde y números, siempre en mayúsculas (por ejemplo, número de licencia). */
+    public static void mayusculasAlfanumerico(JTextField campo, int max) {
+        filtrar(campo, t -> recortar(t.replaceAll("[^A-Za-z0-9]", "").toUpperCase(), max));
+    }
+
     public static void limite(JTextField campo, int max) {
         filtrar(campo, t -> recortar(t, max));
     }
@@ -135,6 +177,7 @@ public final class ValidacionUI {
         JLabel l = new JLabel(" ");
         l.setFont(Tema.fuente(Font.PLAIN, 12f));
         l.setForeground(Tema.ERROR);
+        l.putClientProperty("rq.error", Boolean.TRUE);
         l.setVisible(false);
         return l;
     }
@@ -163,6 +206,33 @@ public final class ValidacionUI {
         return fila(panel, fila, etiqueta, campo, error, null);
     }
 
+    /** Panel para poner dentro de un JScrollPane: siempre toma el ancho visible, así nunca aparece scroll horizontal ni texto cortado. */
+    public static class PanelDesplazable extends JPanel implements javax.swing.Scrollable {
+        public PanelDesplazable(java.awt.LayoutManager layout) {
+            super(layout);
+        }
+
+        public java.awt.Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        public int getScrollableUnitIncrement(java.awt.Rectangle visible, int orientation, int direction) {
+            return 16;
+        }
+
+        public int getScrollableBlockIncrement(java.awt.Rectangle visible, int orientation, int direction) {
+            return Math.max(32, visible.height - 40);
+        }
+
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
+
     // ------------------------------------------------------------ reglas por campo
 
     /** Conjunto de reglas de un formulario: validan al salir del campo y todas juntas al enviar. */
@@ -174,6 +244,15 @@ public final class ValidacionUI {
 
         public void agregar(JComponent campo, JLabel error, Supplier<String> validador) {
             reglas.add(new Regla(campo, error, validador));
+            if (campo instanceof SelectorFecha selector) {
+                // con listas desplegables solo se valida cuando la fecha ya está completa
+                selector.alCambiar(() -> {
+                    if (selector.estaCompleta()) {
+                        mostrar(error, validador.get());
+                    }
+                });
+                return;
+            }
             campo.addFocusListener(new FocusAdapter() {
                 @Override
                 public void focusLost(FocusEvent e) {
@@ -188,7 +267,7 @@ public final class ValidacionUI {
         public boolean validar() {
             JComponent primero = null;
             for (Regla r : reglas) {
-                if (!r.campo().isVisible() || !r.campo().isEnabled()) {
+                if (!r.campo().isShowing() || !r.campo().isEnabled()) {
                     mostrar(r.error(), null);
                     continue;
                 }
