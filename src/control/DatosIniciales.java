@@ -115,6 +115,15 @@ public final class DatosIniciales {
                 conductoresDao.agrega(conductor);
                 conductores.add(conductor);
             }
+            // cada conductor trabaja con un bus y una ruta fijos; el resto (bus y rutas sin asignar) queda libre para el administrador
+            persistencia.AlmacenTexto asignaciones = new persistencia.AlmacenTexto("asignaciones.dat");
+            try {
+                for (int k = 0; k < conductores.size(); k++) {
+                    asignaciones.agregar(conductores.get(k).getIdConductor(), buses.get(k).getIdBus(), rutas.get(k).getIdRuta());
+                }
+            } catch (java.io.IOException ex) {
+                throw new PersistenciaException("No se pudieron guardar las asignaciones de ejemplo: " + ex.getMessage());
+            }
             creados += programarViajes(viajes, fachada, empresa, buses, rutas, conductores, e);
         }
         return creados;
@@ -125,9 +134,10 @@ public final class DatosIniciales {
                                        List<Ruta> rutas, List<Conductor> conductores, int desplazamientoHora) throws PersistenciaException {
         int creados = 0;
         for (int i = 0; i < VIAJES_POR_EMPRESA; i++) {
-            Bus bus = buses.get(i % buses.size());
-            Ruta ruta = rutas.get(i % rutas.size());
+            // el viaje usa el bus y la ruta asignados a su conductor
             Conductor conductor = conductores.get(i % conductores.size());
+            Bus bus = buses.get(i % conductores.size());
+            Ruta ruta = rutas.get(i % conductores.size());
             String hora = HORAS[(i + desplazamientoHora) % HORAS.length];
             LocalDateTime salida = LocalDate.now().plusDays(1L + i).atTime(Integer.parseInt(hora.substring(0, 2)), Integer.parseInt(hora.substring(3)));
             LocalDateTime llegada = salida.plusMinutes(Math.round(ruta.getTiempoEstimado() * 60));

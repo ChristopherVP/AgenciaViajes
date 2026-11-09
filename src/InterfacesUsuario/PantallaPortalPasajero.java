@@ -17,15 +17,15 @@ import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 import objetosNegocio.Usuario;
 
-/** Portal del pasajero: comprar pasajes, administrar la billetera y ver sus reservas. */
+/** Portal del pasajero: comprar pasajes, administrar la billetera, ver sus pasajes y sus facturas. */
 public class PantallaPortalPasajero extends JFrame {
     private final Usuario usuario;
     private final ControladorBilletera billetera = new ControladorBilletera();
     private final JLabel lblSaldo = new JLabel();
-    private final JLabel lblSaludo = new JLabel();
     private PanelComprarPasaje panelComprar;
     private PanelBilletera panelBilletera;
     private PanelMisPasajes panelPasajes;
+    private PanelFacturacion panelFacturas;
 
     public PantallaPortalPasajero(Usuario usuario) {
         this.usuario = usuario;
@@ -33,7 +33,9 @@ public class PantallaPortalPasajero extends JFrame {
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        add(crearCabecera(), BorderLayout.NORTH);
+        lblSaldo.setForeground(new Color(0x0B6B2E));
+        lblSaldo.setFont(Tema.fuente(Font.BOLD, 16f));
+        add(BarraSuperior.crear(this, usuario, lblSaldo, this::actualizarCabecera), BorderLayout.NORTH);
 
         Runnable refrescar = this::refrescarTodo;
         panelComprar = new PanelComprarPasaje(usuario, refrescar);
@@ -44,46 +46,35 @@ public class PantallaPortalPasajero extends JFrame {
         tabs.addTab("Comprar pasaje", panelComprar);
         tabs.addTab("Mi billetera", panelBilletera);
         tabs.addTab("Mis pasajes", panelPasajes);
+        panelFacturas = new PanelFacturacion(usuario, false);
+        tabs.addTab("Mis facturas", conBusqueda(panelFacturas, panelFacturas.getTabla()));
+        Tema.pestanas(tabs);
+        tabs.addChangeListener(e -> {
+            if (tabs.getSelectedComponent() != panelComprar && tabs.getSelectedIndex() == 3) {
+                panelFacturas.cargar();
+            }
+        });
         add(tabs, BorderLayout.CENTER);
         actualizarCabecera();
         setPreferredSize(new Dimension(1000, 680));
         pack();
         setLocationRelativeTo(null);
+        setExtendedState(MAXIMIZED_BOTH);
     }
 
-    private JPanel crearCabecera() {
-        JPanel p = new JPanel(new BorderLayout(14, 0)) {
-            @Override
-            protected void paintComponent(Graphics g0) {
-                Graphics2D g = (Graphics2D) g0.create();
-                g.setPaint(new GradientPaint(0, 0, Tema.AZUL_OSCURO, getWidth(), 0, Tema.AZUL));
-                g.fillRect(0, 0, getWidth(), getHeight());
-                g.dispose();
-            }
-        };
-        p.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
-        p.add(new JLabel(IconoRQ.icono(46)), BorderLayout.WEST);
-        lblSaludo.setForeground(Color.WHITE);
-        lblSaludo.setFont(Tema.fuente(Font.BOLD, 18f));
-        p.add(lblSaludo, BorderLayout.CENTER);
-
-        JPanel derecha = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 4));
-        derecha.setOpaque(false);
-        lblSaldo.setForeground(Tema.AMBAR);
-        lblSaldo.setFont(Tema.fuente(Font.BOLD, 16f));
-        derecha.add(lblSaldo);
-        javax.swing.JButton perfil = Tema.boton("Mi perfil", false);
-        perfil.addActionListener(e -> new DialogoPerfil(this, usuario, this::actualizarCabecera).setVisible(true));
-        javax.swing.JButton salir = Tema.boton("Cerrar sesión", false);
-        salir.addActionListener(e -> Navegador.cerrarSesion(this));
-        derecha.add(perfil);
-        derecha.add(salir);
-        p.add(derecha, BorderLayout.EAST);
-        return p;
+    /** Agrega la barra de búsqueda en vivo sobre una tabla. */
+    private static JPanel conBusqueda(JPanel panel, javax.swing.JTable tabla) {
+        JPanel envoltura = new JPanel(new BorderLayout());
+        envoltura.setOpaque(false);
+        BarraBusqueda barra = BarraBusqueda.para(tabla);
+        if (barra != null) {
+            envoltura.add(barra, BorderLayout.NORTH);
+        }
+        envoltura.add(panel, BorderLayout.CENTER);
+        return envoltura;
     }
 
     private void actualizarCabecera() {
-        lblSaludo.setText("Hola, " + usuario.getNombre());
         ResultadoOperacion s = billetera.consultarSaldo(usuario.getIdPerfil());
         lblSaldo.setText("Saldo: " + (s.isExito() ? Tema.dinero((Double) s.getDatos()) : "—"));
     }
@@ -93,5 +84,6 @@ public class PantallaPortalPasajero extends JFrame {
         panelComprar.recargar();
         panelBilletera.recargar();
         panelPasajes.recargar();
+        panelFacturas.cargar();
     }
 }

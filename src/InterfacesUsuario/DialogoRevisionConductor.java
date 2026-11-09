@@ -187,7 +187,7 @@ public class DialogoRevisionConductor extends JDialog {
             Tema.error(this, r.getMensaje());
             return;
         }
-        Tema.info(this, r.getMensaje() + "\nYa puede iniciar sesión y recibir viajes de la empresa.");
+        Tema.info(this, r.getMensaje());
         alTerminar.run();
         dispose();
     }

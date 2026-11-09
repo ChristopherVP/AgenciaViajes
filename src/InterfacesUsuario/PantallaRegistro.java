@@ -69,6 +69,9 @@ public class PantallaRegistro extends JDialog {
     private final JComboBox<String> cmbTipoLicencia = new JComboBox<>(new String[]{SIN_TIPO, TIPO_D, TIPO_E});
     private final JTextField txtNumeroLicencia = Tema.campo(20);
     private final SelectorFecha selVenceLicencia = new SelectorFecha(LocalDate.now().getYear(), LocalDate.now().getYear() + 10, false);
+    private final JComboBox<String> cmbBanco = new JComboBox<>();
+    private final JTextField txtTarjeta = Tema.campo(20);
+    private final SelectorFecha selVenceTarjeta = new SelectorFecha(LocalDate.now().getYear(), LocalDate.now().getYear() + 12, true);
     private final Map<DocumentosConductor.Tipo, File> documentos = new EnumMap<>(DocumentosConductor.Tipo.class);
     private final Map<DocumentosConductor.Tipo, JLabel> nombresDocumento = new EnumMap<>(DocumentosConductor.Tipo.class);
     private final Map<DocumentosConductor.Tipo, JLabel> erroresDocumento = new EnumMap<>(DocumentosConductor.Tipo.class);
@@ -103,7 +106,11 @@ public class PantallaRegistro extends JDialog {
         for (Empresa e : empresas) {
             cmbEmpresa.addItem(e.getNombre());
         }
-        for (JComboBox<String> c : java.util.List.of(cmbPregunta, cmbEmpresa, cmbTipoLicencia)) {
+        cmbBanco.addItem("Selecciona tu banco...");
+        for (String b : objetosServicio.Bancos.LISTA) {
+            cmbBanco.addItem(b);
+        }
+        for (JComboBox<String> c : java.util.List.of(cmbPregunta, cmbEmpresa, cmbTipoLicencia, cmbBanco)) {
             c.setFont(Tema.fuente(Font.PLAIN, 13f));
         }
 
@@ -117,6 +124,7 @@ public class PantallaRegistro extends JDialog {
         ValidacionUI.correo(txtEmail, 50);
         ValidacionUI.limite(txtRespuesta, 40);
         ValidacionUI.mayusculasAlfanumerico(txtNumeroLicencia, 12);
+        ValidacionUI.tarjeta(txtTarjeta);
         lblProvincia.setForeground(Tema.TEXTO_SUAVE);
 
         JLabel errLogin = ValidacionUI.etiquetaError();
@@ -271,6 +279,50 @@ public class PantallaRegistro extends JDialog {
             b = ValidacionUI.fila(formulario, b, tipo.getEtiqueta() + (tipo.esObligatorio() ? " *" : ""), filaDoc, error);
         }
 
+        JLabel errBanco = ValidacionUI.etiquetaError();
+        JLabel errTarjeta = ValidacionUI.etiquetaError();
+        JLabel errVenceTarjeta = ValidacionUI.etiquetaError();
+        JLabel tituloTarjeta = Tema.titulo("Tarjeta de débito para recibir tus pagos", 15f);
+        g = new GridBagConstraints();
+        g.gridx = 0;
+        g.gridy = b++;
+        g.gridwidth = 2;
+        g.anchor = GridBagConstraints.WEST;
+        g.insets = new Insets(14, 0, 2, 0);
+        formulario.add(tituloTarjeta, g);
+        JLabel notaTarjeta = Tema.nota(560, "<html>Recibirás el <b>80 %</b> de lo que paguen los pasajeros en cada viaje que realices. Solo se acepta una tarjeta "
+                + "de <b>débito</b> Visa o Mastercard <b>a tu nombre</b>. Guardamos únicamente el banco, la marca y los últimos 4 dígitos.</html>");
+        notaTarjeta.setForeground(Tema.TEXTO_SUAVE);
+        g = new GridBagConstraints();
+        g.gridx = 0;
+        g.gridy = b++;
+        g.gridwidth = 2;
+        g.anchor = GridBagConstraints.WEST;
+        g.insets = new Insets(0, 0, 4, 0);
+        formulario.add(notaTarjeta, g);
+        b = ValidacionUI.fila(formulario, b, "Banco *", cmbBanco, errBanco);
+        b = ValidacionUI.fila(formulario, b, "N.º de tarjeta *", txtTarjeta, errTarjeta);
+        b = ValidacionUI.fila(formulario, b, "Vence *", selVenceTarjeta, errVenceTarjeta);
+        reglas.agregar(cmbBanco, errBanco, () -> cmbBanco.getSelectedIndex() <= 0 ? "Elige tu banco o cooperativa" : null);
+        reglas.agregar(txtTarjeta, errTarjeta, () -> {
+            String d = txtTarjeta.getText().replace(" ", "");
+            if (d.length() < 13) {
+                return "El número de tarjeta debe tener entre 13 y 19 dígitos";
+            }
+            String marca = objetosServicio.Bancos.marca(d);
+            if (!Validador.esTarjetaValida(d)) {
+                return "El número de tarjeta no es válido, revísalo";
+            }
+            return marca.equals("VISA") || marca.equals("MASTERCARD") ? null : "Solo se aceptan tarjetas de débito Visa o Mastercard";
+        });
+        reglas.agregar(selVenceTarjeta, errVenceTarjeta, () -> {
+            LocalDate v = selVenceTarjeta.getLocalDate();
+            if (v == null) {
+                return "Elige el mes y el año de vencimiento";
+            }
+            return java.time.YearMonth.from(v).isBefore(java.time.YearMonth.now()) ? "La tarjeta está vencida" : null;
+        });
+
         reglas.agregar(cmbEmpresa, errEmpresa, () -> cmbEmpresa.getSelectedIndex() <= 0 ? "Elige la empresa en la que vas a trabajar" : null);
         reglas.agregar(cmbTipoLicencia, errTipo, () -> cmbTipoLicencia.getSelectedIndex() <= 0 ? "Elige el tipo de licencia" : null);
         reglas.agregar(txtNumeroLicencia, errNumero, () -> txtNumeroLicencia.getText().trim().matches("[A-Z0-9]{6,12}") ? null
@@ -368,7 +420,9 @@ public class PantallaRegistro extends JDialog {
             String tipo = String.valueOf(cmbTipoLicencia.getSelectedItem()).substring(0, 1);
             String idEmpresa = empresas.get(cmbEmpresa.getSelectedIndex() - 1).getIdEmpresa();
             r = controlador.registrarConductor(txtLogin.getText(), txtNombre.getText(), txtCedula.getText(), nacimiento, clave, confirmar, txtEmail.getText(),
-                    txtTelefono.getText(), idEmpresa, tipo, txtNumeroLicencia.getText(), selVenceLicencia.getFecha(), documentos, pregunta, txtRespuesta.getText());
+                    txtTelefono.getText(), idEmpresa, tipo, txtNumeroLicencia.getText(), selVenceLicencia.getFecha(), documentos,
+                    String.valueOf(cmbBanco.getSelectedItem()), txtTarjeta.getText(),
+                    String.format("%02d/%02d", selVenceTarjeta.getFecha().getMes(), selVenceTarjeta.getFecha().getAnio() % 100), pregunta, txtRespuesta.getText());
         }
         if (!r.isExito()) {
             Tema.mostrarMensaje(lblMensaje, r.getMensaje(), false);

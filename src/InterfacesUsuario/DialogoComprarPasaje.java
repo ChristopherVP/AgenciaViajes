@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -37,7 +38,8 @@ public class DialogoComprarPasaje extends JDialog {
     private final JLabel lblSaldo = Tema.etiqueta(" ");
     private final JLabel lblAviso = Tema.mensaje();
     private final JButton btnPagar = Tema.boton("Pagar con mi billetera", true);
-    private final JButton btnRecargar = Tema.boton("Solicitar recarga", false);
+    private final JButton btnRecargar = Tema.boton("Recargar billetera", false);
+    private final JCheckBox chkSinDevolucion = new JCheckBox("Entiendo que mi compra es definitiva: no hay cancelaciones ni devoluciones");
 
     public DialogoComprarPasaje(Window padre, Usuario usuario, Oferta oferta, Runnable alCambiar) {
         super(padre, "Comprar pasaje", Dialog.ModalityType.APPLICATION_MODAL);
@@ -63,8 +65,11 @@ public class DialogoComprarPasaje extends JDialog {
         btnElegir.addActionListener(e -> elegirAsientos());
         JPanel seleccion = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         seleccion.setOpaque(false);
+        JButton btnMapa = Tema.boton("Ver ruta en el mapa", false);
+        btnMapa.addActionListener(e -> verMapa());
         seleccion.add(btnElegir);
         seleccion.add(lblAsientos);
+        seleccion.add(btnMapa);
 
         JPanel totales = Tema.panelFormulario();
         Tema.fila(totales, 0, "Total a pagar", lblTotal);
@@ -95,12 +100,23 @@ public class DialogoComprarPasaje extends JDialog {
         centro.add(medio, BorderLayout.CENTER);
         JPanel sur = new JPanel(new BorderLayout(0, 6));
         sur.setOpaque(false);
-        sur.add(lblAviso, BorderLayout.NORTH);
+        JLabel advertencia = Tema.nota(500, "<html><b>Importante:</b> los pasajes comprados <b>no se pueden cancelar ni se reembolsan</b>. "
+                + "Revisa bien la ruta, el horario y tus asientos antes de pagar.</html>");
+        advertencia.setForeground(new java.awt.Color(0x9A1C1C));
+        chkSinDevolucion.setOpaque(false);
+        chkSinDevolucion.setFont(Tema.fuente(Font.BOLD, 12f));
+        chkSinDevolucion.addActionListener(e -> actualizar());
+        JPanel aviso = new JPanel(new BorderLayout(0, 4));
+        aviso.setOpaque(false);
+        aviso.add(advertencia, BorderLayout.NORTH);
+        aviso.add(chkSinDevolucion, BorderLayout.CENTER);
+        aviso.add(lblAviso, BorderLayout.SOUTH);
+        sur.add(aviso, BorderLayout.NORTH);
         sur.add(botones, BorderLayout.CENTER);
         centro.add(sur, BorderLayout.SOUTH);
         add(centro, BorderLayout.CENTER);
         actualizar();
-        setPreferredSize(new Dimension(620, 580));
+        setPreferredSize(new Dimension(660, 680));
         pack();
         setLocationRelativeTo(padre);
     }
@@ -141,17 +157,19 @@ public class DialogoComprarPasaje extends JDialog {
         double total = (Double) cot.getDatos();
         lblTotal.setText(Tema.dinero(total));
         if (saldo + 1e-9 >= total) {
-            btnPagar.setEnabled(true);
-            Tema.mostrarMensaje(lblAviso, "Listo para pagar.", true);
+            btnPagar.setEnabled(chkSinDevolucion.isSelected());
+            Tema.mostrarMensaje(lblAviso, chkSinDevolucion.isSelected() ? "Listo para pagar." : "Marca la casilla para confirmar que entiendes que no hay devoluciones.", chkSinDevolucion.isSelected());
         } else {
             btnRecargar.setVisible(true);
-            Tema.mostrarMensaje(lblAviso, "Saldo insuficiente: te faltan " + Tema.dinero(total - saldo) + ". Solicita una recarga; cuando el administrador la apruebe podrás pagar.", false);
+            Tema.mostrarMensaje(lblAviso, "Saldo insuficiente: te faltan " + Tema.dinero(total - saldo) + ". Recarga tu billetera (con tarjeta se acredita al instante).", false);
         }
     }
 
     private void pagar() {
-        int opcion = JOptionPane.showConfirmDialog(this, "Se descontarán " + lblTotal.getText() + " de tu billetera.\n¿Confirmar la compra?", "Confirmar compra", JOptionPane.YES_NO_OPTION);
-        if (opcion != JOptionPane.YES_OPTION) {
+        Object[] opciones = {"Sí, comprar", "Cancelar"};
+        int opcion = JOptionPane.showOptionDialog(this, "Se descontarán " + lblTotal.getText() + " de tu billetera.\n\nRecuerda: una vez comprado el pasaje NO se puede cancelar\nni se devuelve el dinero.\n\n¿Confirmar la compra?",
+                "Confirmar compra", JOptionPane.DEFAULT_OPTION, JOptionPane.WARNING_MESSAGE, null, opciones, opciones[1]);
+        if (opcion != 0) {
             return;
         }
         ResultadoOperacion r = compras.comprar(usuario.getIdPerfil(), oferta.getViaje().getIdViaje(), asientos);
@@ -161,8 +179,29 @@ public class DialogoComprarPasaje extends JDialog {
             actualizar();
             return;
         }
-        Tema.info(this, r.getMensaje());
         alCambiar.run();
+        Tema.info(this, r.getMensaje());
+        if (r.getDatos() instanceof objetosNegocio.Reserva reserva) {
+            objetosNegocio.Comprobante factura = new control.ControladorFacturacion().buscarPorReferencia(objetosNegocio.Comprobante.PASAJE, reserva.getIdReserva());
+            if (factura != null) {
+                Window dueno = getOwner();
+                dispose();
+                new DialogoFactura(dueno, factura).setVisible(true);
+                return;
+            }
+        }
         dispose();
+    }
+
+    private void verMapa() {
+        try {
+            objetosNegocio.Ruta ruta = fachadas.FachadaArchivos.getInstance().obten(oferta.getViaje().getRuta());
+            if (ruta != null) {
+                String detalle = "<b>Salida:</b> " + oferta.getSalida().format(FORMATO);
+                new DialogoMapaRuta(this, ruta, detalle).setVisible(true);
+            }
+        } catch (Exception e) {
+            Tema.error(this, "No se pudo cargar la ruta: " + e.getMessage());
+        }
     }
 }

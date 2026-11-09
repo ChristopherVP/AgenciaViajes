@@ -39,8 +39,8 @@ import objetosNegocio.Usuario;
 import objetosNegocio.Viaje;
 
 /**
- * Portal del conductor: solo ve los viajes que el administrador le asignó y puede enviarle reportes
- * (no puede realizar el viaje, falla mecánica, queja...). No puede crear ni modificar viajes.
+ * Portal del conductor: ve su bus y ruta asignados, los viajes que el administrador le programó, notifica cuando un viaje se realizó
+ * con éxito (para que finanzas le pague el 80 %), gestiona su tarjeta de débito y puede enviar reportes al administrador.
  */
 public class PantallaPortalConductor extends JFrame {
     private static final DateTimeFormatter FORMATO = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -56,7 +56,11 @@ public class PantallaPortalConductor extends JFrame {
             return false;
         }
     };
-    private final JCheckBox chkProximos = new JCheckBox("Solo próximos", true);
+    private final JCheckBox chkProximos = new JCheckBox("Ocultar viajes pagados y cancelados", true);
+    private final JLabel lblAsignacion = new JLabel(" ");
+    private final JTable tablaViajes = new JTable(modeloViajes);
+    private PanelMisPagos panelPagos;
+    private PanelFacturacion panelFacturas;
     private List<Viaje> viajes = new ArrayList<>();
 
     private final JComboBox<String> cmbTipo = new JComboBox<>();
@@ -86,46 +90,44 @@ public class PantallaPortalConductor extends JFrame {
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        add(crearCabecera(), BorderLayout.NORTH);
+        lblAsignacion.setFont(Tema.fuente(Font.BOLD, 14f));
+        add(BarraSuperior.crear(this, usuario, lblAsignacion, null), BorderLayout.NORTH);
         JTabbedPane tabs = new JTabbedPane();
         tabs.setFont(Tema.fuente(Font.BOLD, 14f));
         tabs.addTab("Mis viajes", crearPanelViajes());
         tabs.addTab("Reportar al administrador", crearPanelReporte());
         tabs.addTab("Mis reportes", crearPanelReportes());
+        panelPagos = new PanelMisPagos(usuario);
+        tabs.addTab("Mis pagos", panelPagos);
+        panelFacturas = new PanelFacturacion(usuario, false);
+        tabs.addTab("Mis facturas", conBusqueda(panelFacturas, panelFacturas.getTabla()));
+        Tema.pestanas(tabs);
         add(tabs, BorderLayout.CENTER);
         cargarViajes();
         cargarReportes();
         setPreferredSize(new Dimension(1000, 680));
         pack();
         setLocationRelativeTo(null);
+        setExtendedState(MAXIMIZED_BOTH);
     }
 
-    private JPanel crearCabecera() {
-        JPanel p = new JPanel(new BorderLayout(14, 0)) {
-            @Override
-            protected void paintComponent(Graphics g0) {
-                Graphics2D g = (Graphics2D) g0.create();
-                g.setPaint(new GradientPaint(0, 0, Tema.AZUL_OSCURO, getWidth(), 0, Tema.AZUL));
-                g.fillRect(0, 0, getWidth(), getHeight());
-                g.dispose();
-            }
-        };
-        p.setBorder(BorderFactory.createEmptyBorder(10, 18, 10, 18));
-        p.add(new JLabel(IconoRQ.icono(46)), BorderLayout.WEST);
-        JLabel saludo = new JLabel("Hola, " + usuario.getNombre());
-        saludo.setForeground(Color.WHITE);
-        saludo.setFont(Tema.fuente(Font.BOLD, 18f));
-        p.add(saludo, BorderLayout.CENTER);
-        JPanel derecha = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 4));
-        derecha.setOpaque(false);
-        javax.swing.JButton perfil = Tema.boton("Mi perfil", false);
-        perfil.addActionListener(e -> new DialogoPerfil(this, usuario, () -> saludo.setText("Hola, " + usuario.getNombre())).setVisible(true));
-        javax.swing.JButton salir = Tema.boton("Cerrar sesión", false);
-        salir.addActionListener(e -> Navegador.cerrarSesion(this));
-        derecha.add(perfil);
-        derecha.add(salir);
-        p.add(derecha, BorderLayout.EAST);
-        return p;
+    private static JPanel conBusqueda(JPanel panel, JTable tabla) {
+        JPanel envoltura = new JPanel(new BorderLayout());
+        envoltura.setOpaque(false);
+        BarraBusqueda barra = BarraBusqueda.para(tabla);
+        if (barra != null) {
+            envoltura.add(barra, BorderLayout.NORTH);
+        }
+        envoltura.add(panel, BorderLayout.CENTER);
+        return envoltura;
+    }
+
+    /** Muestra el bus y la ruta asignados, o el aviso de que aún no tiene. */
+    private void actualizarAsignacion() {
+        String texto = new control.ControladorAsignaciones().describir(usuario.getIdPerfil());
+        boolean sin = texto.startsWith("Sin bus");
+        lblAsignacion.setText(sin ? "Aún no tienes bus ni ruta asignados" : "Mi bus y ruta: " + texto);
+        lblAsignacion.setForeground(sin ? Tema.ERROR : new Color(0x0B6B2E));
     }
 
     // ------------------------------------------------------------------ mis viajes
@@ -134,20 +136,25 @@ public class PantallaPortalConductor extends JFrame {
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(Tema.FONDO);
         p.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
-        JTable tabla = new JTable(modeloViajes);
-        Tema.tabla(tabla);
-        JScrollPane scroll = new JScrollPane(tabla);
+        Tema.tabla(tablaViajes);
+        JScrollPane scroll = new JScrollPane(tablaViajes);
         scroll.getViewport().setBackground(Color.WHITE);
         p.add(scroll, BorderLayout.CENTER);
         chkProximos.setOpaque(false);
         chkProximos.addActionListener(e -> cargarViajes());
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> cargarViajes());
+        javax.swing.JButton notificar = Tema.boton("Notificar viaje realizado", true);
+        notificar.addActionListener(e -> notificarViaje());
+        javax.swing.JButton verRuta = Tema.boton("Ver ruta en el mapa", false);
+        verRuta.addActionListener(e -> verRuta());
         JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         arriba.setOpaque(false);
+        arriba.add(notificar);
+        arriba.add(verRuta);
         arriba.add(chkProximos);
         arriba.add(actualizar);
-        JLabel nota = Tema.etiqueta("Estos viajes los asigna el administrador. Si no puedes realizar alguno, repórtalo en la pestaña \"Reportar al administrador\".");
+        JLabel nota = Tema.etiqueta("Cuando termines un viaje pulsa \"Notificar viaje realizado\": finanzas te paga el 80 % de lo recaudado.");
         nota.setForeground(Tema.TEXTO_SUAVE);
         arriba.add(nota);
         p.add(arriba, BorderLayout.NORTH);
@@ -155,6 +162,7 @@ public class PantallaPortalConductor extends JFrame {
     }
 
     private void cargarViajes() {
+        actualizarAsignacion();
         modeloViajes.setRowCount(0);
         ResultadoOperacion r = portal.viajesAsignados(usuario);
         if (!r.isExito()) {
@@ -172,7 +180,8 @@ public class PantallaPortalConductor extends JFrame {
             LocalDateTime salida = ControladorCompras.salidaDe(v);
             boolean proximo = salida != null && salida.isAfter(LocalDateTime.now().minusHours(6));
             boolean cancelado = v.getEstado() != null && v.getEstado().toLowerCase().startsWith("cancel");
-            if (chkProximos.isSelected() && (!proximo || cancelado)) {
+            boolean completado = v.getEstado() != null && v.getEstado().equalsIgnoreCase("Completado");
+            if (chkProximos.isSelected() && (cancelado || completado)) {
                 continue;
             }
             viajes.add(v);
@@ -184,6 +193,55 @@ public class PantallaPortalConductor extends JFrame {
             if (proximo && !cancelado) {
                 cmbViaje.addItem(v.getIdViaje() + " · " + ruta + " · " + (salida == null ? "" : salida.format(FORMATO)));
                 idsViaje.add(v.getIdViaje());
+            }
+        }
+    }
+
+    private String viajeSeleccionado() {
+        int fila = tablaViajes.getSelectedRow();
+        if (fila < 0) {
+            Tema.error(this, "Selecciona un viaje de la lista.");
+            return null;
+        }
+        return String.valueOf(modeloViajes.getValueAt(fila, 0));
+    }
+
+    private void notificarViaje() {
+        String id = viajeSeleccionado();
+        if (id == null) {
+            return;
+        }
+        Object[] opciones = {"Sí, se realizó con éxito", "Cancelar"};
+        if (javax.swing.JOptionPane.showOptionDialog(this, "¿Confirmas que el viaje " + id + " se realizó con éxito?\nSe calculará tu pago (80 % de lo que pagaron los pasajeros) y\nfinanzas lo depositará en tu tarjeta de débito.",
+                "Notificar viaje realizado", javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[1]) != 0) {
+            return;
+        }
+        ResultadoOperacion r = new control.ControladorLiquidaciones().notificarViajeRealizado(usuario, id);
+        if (!r.isExito()) {
+            Tema.error(this, r.getMensaje());
+            return;
+        }
+        Tema.info(this, r.getMensaje());
+        cargarViajes();
+        panelPagos.cargar();
+    }
+
+    private void verRuta() {
+        String id = viajeSeleccionado();
+        if (id == null) {
+            return;
+        }
+        for (Viaje v : viajes) {
+            if (v.getIdViaje().equals(id)) {
+                try {
+                    objetosNegocio.Ruta ruta = fachadas.FachadaArchivos.getInstance().obten(v.getRuta());
+                    if (ruta != null) {
+                        new DialogoMapaRuta(this, ruta, "").setVisible(true);
+                    }
+                } catch (Exception e) {
+                    Tema.error(this, "No se pudo cargar la ruta: " + e.getMessage());
+                }
+                return;
             }
         }
     }

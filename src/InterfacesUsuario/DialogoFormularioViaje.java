@@ -268,6 +268,7 @@ public class DialogoFormularioViaje extends JDialog {
         g.gridx = 1;
         this.cmbConductor1 = new JComboBox<>();
         this.cmbConductor1.addItem("-- Seleccione Conductor Principal --");
+        this.cmbConductor1.addActionListener(e -> this.autocompletarPorConductor());
         p.add(this.cmbConductor1, g);
         g.gridx = 0;
         g.gridy = 10;
@@ -398,6 +399,41 @@ public class DialogoFormularioViaje extends JDialog {
         }
     }
 
+    /**
+     * Al elegir el conductor principal de un viaje nuevo se completan solos su bus y su ruta asignados. Si el conductor aún no tiene
+     * asignación no se le puede programar un viaje.
+     */
+    private void autocompletarPorConductor() {
+        if (this.viaje != null || this.cmbConductor1.getSelectedIndex() <= 0 || this.cmbConductor1.getSelectedItem() == null) {
+            return;
+        }
+        String idConductor = ((String) this.cmbConductor1.getSelectedItem()).split(" - ")[0].trim();
+        control.ControladorAsignaciones.Asignacion a = new control.ControladorAsignaciones().obtener(idConductor);
+        if (a == null) {
+            JOptionPane.showMessageDialog(this, "Este conductor aún no tiene bus ni ruta asignados.\nAsígnalos primero en la pestaña Conductores (botón \"Asignar bus y ruta\").",
+                    "Conductor sin asignación", JOptionPane.WARNING_MESSAGE);
+            this.cmbConductor1.setSelectedIndex(0);
+            return;
+        }
+        try {
+            fachadas.FachadaArchivos fachada = fachadas.FachadaArchivos.getInstance();
+            Bus bus = fachada.obten(new Bus(a.getIdBus()));
+            Ruta ruta = fachada.obten(new Ruta(a.getIdRuta()));
+            if (bus == null || ruta == null) {
+                return;
+            }
+            this.busSeleccionadoObj = bus;
+            this.txtBus.setText(bus.getPlaca() + " - " + bus.getMarca());
+            this.cmbOrigen.setSelectedItem(ruta.getOrigen());
+            this.cmbDestino.setSelectedItem(ruta.getDestino());
+            this.rutaSeleccionadaObj = ruta;
+            this.actualizarCapacidadBus();
+            this.calcularLlegada();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "No se pudo cargar el bus y la ruta del conductor: " + ex.getMessage());
+        }
+    }
+
     private void filtrarListasPorEmpresa() {
         this.cmbConductor1.removeAllItems();
         this.cmbConductor1.addItem("-- Seleccione Conductor Principal --");
@@ -407,7 +443,7 @@ public class DialogoFormularioViaje extends JDialog {
             String idEmpresa = this.empresaSeleccionadaObj.getIdEmpresa();
 
             for(Conductor c : this.conductores) {
-                if (c.getEmpresa() != null && c.getEmpresa().getIdEmpresa() != null && c.getEmpresa().getIdEmpresa().trim().equalsIgnoreCase(idEmpresa)) {
+                if ("ACTIVO".equalsIgnoreCase(c.getEstado()) && c.getEmpresa() != null && c.getEmpresa().getIdEmpresa() != null && c.getEmpresa().getIdEmpresa().trim().equalsIgnoreCase(idEmpresa)) {
                     String var13 = c.getIdConductor();
                     String item = var13 + " - " + c.getNombre();
                     this.cmbConductor1.addItem(item);
@@ -488,9 +524,11 @@ public class DialogoFormularioViaje extends JDialog {
         }
 
         if (this.viaje.getRuta() != null) {
-            this.rutaSeleccionadaObj = this.viaje.getRuta();
-            this.cmbOrigen.setSelectedItem(this.rutaSeleccionadaObj.getOrigen());
-            this.cmbDestino.setSelectedItem(this.rutaSeleccionadaObj.getDestino());
+            // al elegir origen y destino los combos recalculan la ruta y pueden dejarla en null: se guarda en una variable local
+            Ruta rutaDelViaje = this.viaje.getRuta();
+            this.cmbOrigen.setSelectedItem(rutaDelViaje.getOrigen());
+            this.cmbDestino.setSelectedItem(rutaDelViaje.getDestino());
+            this.rutaSeleccionadaObj = rutaDelViaje;
         }
 
         this.txtAsientos.setText(String.valueOf(this.viaje.getAsientosDisponibles()));

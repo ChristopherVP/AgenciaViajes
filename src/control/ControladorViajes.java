@@ -52,6 +52,10 @@ public class ControladorViajes {
                         } else if (bus.getEmpresa() != null && ruta.getEmpresa() != null && !bus.getEmpresa().getIdEmpresa().equals(ruta.getEmpresa().getIdEmpresa())) {
                             return new ResultadoOperacion(false, "El bus y la ruta deben pertenecer a la misma empresa.");
                         } else if (idConductor1 != null && !idConductor1.trim().isEmpty()) {
+                            String sinAsignacion = new ControladorAsignaciones().errorParaViaje(idConductor1, idBus, idRuta);
+                            if (sinAsignacion != null) {
+                                return new ResultadoOperacion(false, sinAsignacion);
+                            }
                             ResultadoOperacion disponibilidad = this.verificarDisponibilidadBus(idBus, fechaSalida, fechaLlegada);
                             if (!disponibilidad.isExito()) {
                                 return disponibilidad;
@@ -65,7 +69,7 @@ public class ControladorViajes {
                                 this.fachada.agrega(viaje);
                                 if (generarAsientos) {
                                     try {
-                                        ((FachadaArchivos)this.fachada).generarAsientosParaViaje(idViaje, bus.getCapacidad());
+                                        ((FachadaArchivos)this.fachada).generarAsientosParaViaje(viaje.getIdViaje(), bus.getCapacidad());
                                     } catch (Exception var22) {
                                         System.err.println("Advertencia: No se pudieron generar los asientos automáticamente");
                                     }
@@ -107,6 +111,11 @@ public class ControladorViajes {
                                 if (bus.getEmpresa() != null && ruta.getEmpresa() != null && !bus.getEmpresa().getIdEmpresa().equals(ruta.getEmpresa().getIdEmpresa())) {
                                     return new ResultadoOperacion(false, "El bus y la ruta deben pertenecer a la misma empresa.");
                                 } else {
+                                    String sinAsignacion = (idConductor1 == null || idConductor1.trim().isEmpty()) ? "Debe asignar un conductor principal."
+                                            : new ControladorAsignaciones().errorParaViaje(idConductor1, idBus, idRuta);
+                                    if (sinAsignacion != null) {
+                                        return new ResultadoOperacion(false, sinAsignacion);
+                                    }
                                     viajeExistente.setBus(bus);
                                     viajeExistente.setRuta(ruta);
                                     viajeExistente.setEmpresa(empresa);

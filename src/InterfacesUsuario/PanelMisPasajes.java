@@ -17,7 +17,7 @@ import objetosNegocio.Reserva;
 import objetosNegocio.Usuario;
 import objetosNegocio.Viaje;
 
-/** Reservas del pasajero y cancelación con reembolso a la billetera. */
+/** Pasajes comprados por el pasajero. Son definitivos: no se cancelan ni se reembolsan. Se puede ver la ruta y la factura de cada uno. */
 public class PanelMisPasajes extends JPanel {
     private final ControladorCompras compras = new ControladorCompras();
     private final Usuario usuario;
@@ -43,15 +43,18 @@ public class PanelMisPasajes extends JPanel {
         scroll.getViewport().setBackground(Color.WHITE);
         add(scroll, BorderLayout.CENTER);
 
-        javax.swing.JButton cancelar = Tema.boton("Cancelar pasaje", false);
-        cancelar.addActionListener(e -> cancelar());
+        javax.swing.JButton verRuta = Tema.boton("Ver ruta en el mapa", false);
+        verRuta.addActionListener(e -> verRuta());
+        javax.swing.JButton verFactura = Tema.boton("Ver factura", true);
+        verFactura.addActionListener(e -> verFactura());
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> recargar());
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         botones.setOpaque(false);
         botones.add(actualizar);
-        botones.add(cancelar);
-        JLabel regla = Tema.etiqueta("Puedes cancelar hasta 24 horas antes de la salida. El valor se devuelve a tu billetera.");
+        botones.add(verRuta);
+        botones.add(verFactura);
+        JLabel regla = Tema.etiqueta("Los pasajes comprados son definitivos: no se cancelan ni se devuelve el dinero.");
         regla.setForeground(Tema.TEXTO_SUAVE);
         JPanel sur = new JPanel(new BorderLayout());
         sur.setOpaque(false);
@@ -86,23 +89,41 @@ public class PanelMisPasajes extends JPanel {
         lblMensaje.setText(reservas.isEmpty() ? "Aún no has comprado pasajes." : " ");
     }
 
-    private void cancelar() {
+    private Reserva seleccionada() {
         int fila = tabla.getSelectedRow();
         if (fila < 0) {
-            Tema.error(this, "Selecciona la reserva que quieres cancelar.");
+            Tema.error(this, "Selecciona uno de tus pasajes.");
+            return null;
+        }
+        String id = String.valueOf(modelo.getValueAt(fila, 0));
+        return reservas.stream().filter(r -> r.getIdReserva().equals(id)).findFirst().orElse(null);
+    }
+
+    private void verRuta() {
+        Reserva r = seleccionada();
+        if (r == null || r.getViaje() == null) {
             return;
         }
-        Reserva r = reservas.get(fila);
-        if (JOptionPane.showConfirmDialog(this, "¿Cancelar la reserva " + r.getIdReserva() + "?", "Confirmar cancelación", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+        try {
+            objetosNegocio.Ruta ruta = fachadas.FachadaArchivos.getInstance().obten(r.getViaje().getRuta());
+            if (ruta != null) {
+                new DialogoMapaRuta(javax.swing.SwingUtilities.getWindowAncestor(this), ruta, "").setVisible(true);
+            }
+        } catch (Exception e) {
+            Tema.error(this, "No se pudo cargar la ruta: " + e.getMessage());
+        }
+    }
+
+    private void verFactura() {
+        Reserva r = seleccionada();
+        if (r == null) {
             return;
         }
-        ResultadoOperacion res = compras.cancelar(usuario.getIdPerfil(), r.getIdReserva());
-        if (!res.isExito()) {
-            Tema.error(this, res.getMensaje());
+        objetosNegocio.Comprobante c = new control.ControladorFacturacion().buscarPorReferencia(objetosNegocio.Comprobante.PASAJE, r.getIdReserva());
+        if (c == null) {
+            Tema.info(this, "Este pasaje no tiene factura registrada.");
             return;
         }
-        Tema.info(this, res.getMensaje());
-        recargar();
-        alCambiar.run();
+        new DialogoFactura(javax.swing.SwingUtilities.getWindowAncestor(this), c).setVisible(true);
     }
 }

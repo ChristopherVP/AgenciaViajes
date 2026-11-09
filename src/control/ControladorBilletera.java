@@ -10,7 +10,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import objetosNegocio.Comprobante;
 import objetosNegocio.Movimiento;
+import objetosServicio.Permisos;
 import objetosNegocio.Pasajero;
 import objetosNegocio.Rol;
 import objetosNegocio.Usuario;
@@ -99,7 +101,17 @@ public class ControladorBilletera {
             return new ResultadoOperacion(false, problema);
         }
         String referencia = marca(digitos) + " ****" + digitos.substring(digitos.length() - 4);
-        return registrarSolicitud(idPasajero, monto, Movimiento.METODO_TARJETA, referencia);
+        // el pago con tarjeta se procesa al instante: se acredita y se emite la factura de inmediato
+        try {
+            Movimiento m = nuevoMovimiento(idPasajero, Movimiento.RECARGA, monto, Movimiento.METODO_TARJETA, Movimiento.APROBADA, referencia);
+            m.setIdRevisor("SISTEMA");
+            m.setMotivo("Pago con tarjeta aprobado");
+            movimientos.agrega(m);
+            Comprobante factura = new ControladorFacturacion().emitirRecarga(m);
+            return new ResultadoOperacion(true, String.format("Recarga acreditada: +$%.2f%s", m.getMonto(), factura == null ? "" : ". Factura " + factura.getNumero()), m);
+        } catch (PersistenciaException e) {
+            return new ResultadoOperacion(false, e.getMessage());
+        }
     }
 
     public synchronized ResultadoOperacion solicitarRecargaEfectivo(String idPasajero, double monto, String comprobante) {
@@ -151,7 +163,7 @@ public class ControladorBilletera {
         try {
             Movimiento m = nuevoMovimiento(idPasajero, Movimiento.RECARGA, monto, metodo, Movimiento.PENDIENTE, referencia);
             movimientos.agrega(m);
-            return new ResultadoOperacion(true, "Solicitud de recarga enviada. Quedará disponible cuando el administrador la apruebe.", m);
+            return new ResultadoOperacion(true, "Solicitud enviada. Cuando finanzas verifique tu pago en efectivo se acreditará el saldo y recibirás tu factura.", m);
         } catch (PersistenciaException e) {
             return new ResultadoOperacion(false, e.getMessage());
         }
@@ -171,8 +183,8 @@ public class ControladorBilletera {
     }
 
     private ResultadoOperacion revisar(Usuario actor, String idMovimiento, boolean aprobar, String motivo) {
-        if (actor == null || actor.getRol() != Rol.ADMINISTRADOR || !actor.esSuperAdministrador() || !actor.estaActivo()) {
-            return new ResultadoOperacion(false, "Solo el administrador general puede revisar recargas");
+        if (!Permisos.puedeEditar(actor, Permisos.Modulo.RECARGAS)) {
+            return new ResultadoOperacion(false, "Tu cargo no puede revisar recargas (lo hace finanzas)");
         }
         try {
             Movimiento m = movimientos.obten(idMovimiento);
@@ -186,7 +198,8 @@ public class ControladorBilletera {
             m.setIdRevisor(actor.getIdUsuario());
             m.setMotivo(aprobar ? "Aprobada" : motivo);
             movimientos.actualiza(m);
-            return new ResultadoOperacion(true, aprobar ? String.format("Recarga aprobada: +$%.2f", m.getMonto()) : "Recarga rechazada", m);
+            Comprobante factura = aprobar ? new ControladorFacturacion().emitirRecarga(m) : null;
+            return new ResultadoOperacion(true, aprobar ? String.format("Recarga aprobada: +$%.2f%s", m.getMonto(), factura == null ? "" : ". Factura " + factura.getNumero()) : "Recarga rechazada", m);
         } catch (PersistenciaException e) {
             return new ResultadoOperacion(false, e.getMessage());
         }

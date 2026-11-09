@@ -239,8 +239,17 @@ public class DialogoRecarga extends JDialog {
         }
         txtNumero.setText("");
         txtCvv.setText("");
-        Tema.info(this, r.getMensaje());
         alEnviar.run();
+        Tema.info(this, r.getMensaje());
+        if (r.getDatos() instanceof objetosNegocio.Movimiento movimiento && movimiento.getEstado().equalsIgnoreCase(objetosNegocio.Movimiento.APROBADA)) {
+            objetosNegocio.Comprobante factura = new control.ControladorFacturacion().buscarPorReferencia(objetosNegocio.Comprobante.RECARGA, movimiento.getIdMovimiento());
+            if (factura != null) {
+                Window dueno = getOwner();
+                dispose();
+                new DialogoFactura(dueno, factura).setVisible(true);
+                return;
+            }
+        }
         dispose();
     }
 }

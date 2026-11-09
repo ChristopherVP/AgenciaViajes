@@ -73,7 +73,7 @@ public class DialogoMapaAsientos extends JDialog {
         panelCabina.setBackground(new Color(220, 220, 220));
         panelCabina.setBorder(BorderFactory.createLineBorder(Color.GRAY, 1, true));
         panelCabina.setPreferredSize(new Dimension(300, 40));
-        JLabel lblConductor = new JLabel("⎈ CONDUCTOR / FRENTE", 0);
+        JLabel lblConductor = new JLabel("CONDUCTOR / FRENTE DEL BUS", 0);
         lblConductor.setFont(new Font("Arial", 1, 12));
         lblConductor.setForeground(Color.DARK_GRAY);
         panelCabina.add(lblConductor);
@@ -98,7 +98,7 @@ public class DialogoMapaAsientos extends JDialog {
         this.lblInfo.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 20));
         JButton btnConfirmar = new JButton("Confirmar Selección");
         btnConfirmar.setBackground(new Color(41, 128, 185));
-        btnConfirmar.setForeground(Color.WHITE);
+        btnConfirmar.setForeground(Color.BLACK);
         btnConfirmar.setFocusPainted(false);
         btnConfirmar.setFont(new Font("Arial", 1, 12));
         btnConfirmar.addActionListener((e) -> {
@@ -188,7 +188,7 @@ public class DialogoMapaAsientos extends JDialog {
         boolean esPropio = this.asientosPropios.contains(asiento.getNumeroAsiento());
         if (esPropio) {
             btn.setBackground(new Color(52, 152, 219));
-            btn.setForeground(Color.WHITE);
+            btn.setForeground(Color.BLACK);
             btn.setSelected(true);
             btn.addActionListener((e) -> this.toggleSeleccion(asiento.getNumeroAsiento(), btn));
         } else if ("Disponible".equalsIgnoreCase(estado)) {
@@ -210,7 +210,7 @@ public class DialogoMapaAsientos extends JDialog {
         if (btn.isSelected()) {
             this.asientosSeleccionados.add(numeroAsiento);
             btn.setBackground(new Color(52, 152, 219));
-            btn.setForeground(Color.WHITE);
+            btn.setForeground(Color.BLACK);
         } else {
             this.asientosSeleccionados.remove(numeroAsiento);
             btn.setBackground(new Color(46, 204, 113));

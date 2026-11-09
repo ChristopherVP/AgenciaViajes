@@ -31,7 +31,17 @@ public class PanelGestionConductores extends JPanel {
     private ControladorConductores controlador = new ControladorConductores();
     private Empresa empresaFiltro;
 
+    private objetosNegocio.Usuario usuario;
+    private final control.ControladorAsignaciones asignaciones = new control.ControladorAsignaciones();
+
     public PanelGestionConductores() {
+        this.initComponents();
+        this.cargarDatos();
+    }
+
+    /** El usuario permite saber qué puede hacer su cargo (asignar bus y ruta, editar). */
+    public PanelGestionConductores(objetosNegocio.Usuario usuario) {
+        this.usuario = usuario;
         this.initComponents();
         this.cargarDatos();
     }
@@ -46,21 +56,26 @@ public class PanelGestionConductores extends JPanel {
         this.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         JPanel panelBotones = new JPanel(new FlowLayout(0));
         JButton btnTodos = new JButton("Todos");
-        JButton btnAgregar = new JButton("Agregar");
         JButton btnEditar = new JButton("Editar");
         JButton btnEliminar = new JButton("Eliminar");
-        JButton btnBuscar = new JButton("Buscar");
+        JButton btnAsignar = new JButton("Asignar bus y ruta");
+        JButton btnQuitar = new JButton("Quitar asignación");
         btnTodos.addActionListener((e) -> this.cargarDatos());
-        btnAgregar.addActionListener((e) -> this.agregar());
         btnEditar.addActionListener((e) -> this.editar());
         btnEliminar.addActionListener((e) -> this.eliminar());
-        btnBuscar.addActionListener((e) -> this.buscar());
+        btnAsignar.addActionListener((e) -> this.asignar());
+        btnQuitar.addActionListener((e) -> this.quitarAsignacion());
+        // los conductores se registran solos desde "Crear cuenta": el administrador no los agrega
         panelBotones.add(btnTodos);
-        panelBotones.add(btnAgregar);
+        panelBotones.add(btnAsignar);
+        panelBotones.add(btnQuitar);
         panelBotones.add(btnEditar);
         panelBotones.add(btnEliminar);
-        panelBotones.add(btnBuscar);
-        String[] cols = new String[]{"ID", "Nombre", "Cédula", "Licencia", "Teléfono", "Empresa", "Estado"};
+        boolean puedeEditar = usuario == null || objetosServicio.Permisos.puedeEditar(usuario, objetosServicio.Permisos.Modulo.CONDUCTORES);
+        for (JButton b : new JButton[]{btnAsignar, btnQuitar, btnEditar, btnEliminar}) {
+            b.setEnabled(puedeEditar);
+        }
+        String[] cols = new String[]{"ID", "Nombre", "Cédula", "Licencia", "Teléfono", "Empresa", "Estado", "Bus y ruta asignados"};
         this.modelo = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) {
                 return false;
@@ -96,13 +111,43 @@ public class PanelGestionConductores extends JPanel {
                         nombreEmpresa = (String)mapaEmpresas.getOrDefault(id, id);
                     }
 
-                    this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado()});
+                    this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado(), this.asignaciones.describir(c.getIdConductor())});
                 }
             }
         } else {
             JOptionPane.showMessageDialog(this, "Error: " + res.getMensaje());
         }
 
+    }
+
+    private Conductor seleccionado() {
+        int fila = this.tabla.getSelectedRow();
+        if (fila == -1) {
+            JOptionPane.showMessageDialog(this, "Seleccione un conductor", "Aviso", 2);
+            return null;
+        }
+        try {
+            return this.controlador.buscarConductor((String) this.modelo.getValueAt(fila, 0));
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void asignar() {
+        Conductor c = this.seleccionado();
+        if (c != null && this.usuario != null) {
+            new DialogoAsignacionConductor(SwingUtilities.getWindowAncestor(this), this.usuario, c, this::cargarDatos).setVisible(true);
+        }
+    }
+
+    private void quitarAsignacion() {
+        Conductor c = this.seleccionado();
+        if (c != null && this.usuario != null) {
+            ResultadoOperacion r = this.asignaciones.quitar(this.usuario, c.getIdConductor());
+            JOptionPane.showMessageDialog(this, r.getMensaje());
+            this.cargarDatos();
+        }
     }
 
     private void agregar() {
@@ -186,7 +231,7 @@ public class PanelGestionConductores extends JPanel {
                         }
 
                         this.modelo.setRowCount(0);
-                        this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado()});
+                        this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado(), this.asignaciones.describir(c.getIdConductor())});
                     } else {
                         JOptionPane.showMessageDialog(this, "Conductor no encontrado");
                     }
@@ -222,7 +267,7 @@ public class PanelGestionConductores extends JPanel {
                                     nombreEmpresa = (String)mapaEmpresas.getOrDefault(id, id);
                                 }
 
-                                this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado()});
+                                this.modelo.addRow(new Object[]{c.getIdConductor(), c.getNombre(), c.getCedula(), c.getLicencia(), c.getTelefono(), nombreEmpresa, c.getEstado(), this.asignaciones.describir(c.getIdConductor())});
                                 encontrado = true;
                             }
                         }

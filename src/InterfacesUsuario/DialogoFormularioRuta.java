@@ -211,23 +211,25 @@ public class DialogoFormularioRuta extends JDialog {
         g.gridx = 0;
         g.gridy = 6;
         g.anchor = 13;
-        pForm.add(new JLabel("Paradas:"), g);
+        pForm.add(new JLabel("Pasa por (sin paradas):"), g);
         g.anchor = 17;
         g.gridx = 1;
         this.txtParadas = new JTextArea(4, 20);
         this.txtParadas.setLineWrap(true);
         this.txtParadas.setWrapStyleWord(true);
-        this.txtParadas.setToolTipText("Se generará automáticamente la ruta óptima");
+        this.txtParadas.setToolTipText("Ciudades por las que pasa el bus (solo informativo para el pasajero; el viaje es directo y sin paradas)");
         JScrollPane scrollParadas = new JScrollPane(this.txtParadas);
         pForm.add(scrollParadas, g);
         g.gridx = 0;
         g.gridy = 7;
         g.anchor = 13;
-        pForm.add(new JLabel("T. Detención (min):"), g);
+        pForm.add(new JLabel("Paradas del bus:"), g);
         g.anchor = 17;
         g.gridx = 1;
         this.txtTiempoDetencion = new JTextField(20);
-        this.txtTiempoDetencion.setText("15");
+        this.txtTiempoDetencion.setText("0");
+        this.txtTiempoDetencion.setEditable(false);
+        this.txtTiempoDetencion.setToolTipText("Todos los viajes son directos: el bus no hace paradas, solo pasa por las ciudades indicadas");
         pForm.add(this.txtTiempoDetencion, g);
         g.gridx = 0;
         g.gridy = 8;
@@ -315,7 +317,7 @@ public class DialogoFormularioRuta extends JDialog {
         this.txtPrecio.setText(String.valueOf(this.ruta.getPrecio()));
         this.txtTiempoEstimado.setText(String.valueOf(this.ruta.getTiempoEstimado()));
         this.txtParadas.setText(this.ruta.getParadas());
-        this.txtTiempoDetencion.setText(String.valueOf(this.ruta.getTiempoDetencion()));
+        this.txtTiempoDetencion.setText("0");
         this.cmbEstado.setSelectedItem(this.ruta.getEstado());
         if (this.ruta.getEmpresa() != null) {
             for(int i = 0; i < this.cmbEmpresa.getItemCount(); ++i) {
@@ -383,7 +385,7 @@ public class DialogoFormularioRuta extends JDialog {
                         List<String> intermedias = resultado.camino.subList(1, resultado.camino.size() - 1);
                         this.txtParadas.setText(String.join(", ", intermedias));
                     } else {
-                        this.txtParadas.setText("Directo (Sin paradas intermedias importantes)");
+                        this.txtParadas.setText("Directo (no pasa por otras ciudades importantes)");
                     }
 
                     this.panelMapa.setRuta(resultado.camino);

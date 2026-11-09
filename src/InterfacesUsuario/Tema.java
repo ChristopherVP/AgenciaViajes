@@ -79,6 +79,32 @@ public final class Tema {
         UIManager.put("TabbedPane.font", fuente(Font.BOLD, 13f));
         UIManager.put("TableHeader.foreground", Color.BLACK);
         UIManager.put("TableHeader.font", fuente(Font.BOLD, 13f));
+        UIManager.put("Button.foreground", Color.BLACK);
+        // cada ventana que se abre se revisa: los botones antiguos con letra blanca pasan a letra negra
+        java.awt.Toolkit.getDefaultToolkit().addAWTEventListener(ev -> {
+            if (ev instanceof java.awt.event.WindowEvent we && we.getID() == java.awt.event.WindowEvent.WINDOW_OPENED) {
+                javax.swing.SwingUtilities.invokeLater(() -> legibilizar(we.getWindow()));
+            }
+        }, java.awt.AWTEvent.WINDOW_EVENT_MASK);
+    }
+
+    /**
+     * Con el aspecto de Windows los botones con color propio se ven claros y su letra blanca no se lee. Todos los botones
+     * antiguos pasan a letra negra; los botones del tema nuevo (BotonRQ) se dejan como están.
+     */
+    public static void legibilizar(java.awt.Component c) {
+        if (c instanceof javax.swing.AbstractButton b && !(c instanceof javax.swing.JCheckBox) && !(c instanceof javax.swing.JRadioButton)
+                && !"BotonRQ".equals(c.getClass().getSimpleName()) && !(c instanceof javax.swing.JMenuItem)) {
+            java.awt.Color fg = b.getForeground();
+            if (fg != null && (fg.getRed() + fg.getGreen() + fg.getBlue()) / 3 > 150) {
+                b.setForeground(Color.BLACK);
+            }
+        }
+        if (c instanceof java.awt.Container k) {
+            for (java.awt.Component h : k.getComponents()) {
+                legibilizar(h);
+            }
+        }
     }
 
     /** Pestañas con letra negra y en negrita; si no caben, se desplazan en lugar de apilarse en varias filas. */

@@ -167,8 +167,8 @@ public class ControladorNovedades {
     }
 
     public synchronized ResultadoOperacion responder(Usuario actor, String idNovedad, String respuesta, String nuevoEstado) {
-        if (actor == null || actor.getRol() != Rol.ADMINISTRADOR || !actor.estaActivo()) {
-            return new ResultadoOperacion(false, "Solo un administrador puede responder reportes");
+        if (!objetosServicio.Permisos.puedeEditar(actor, objetosServicio.Permisos.Modulo.NOVEDADES)) {
+            return new ResultadoOperacion(false, "Tu cargo no puede responder reportes");
         }
         if (!Novedad.EN_REVISION.equals(nuevoEstado) && !Novedad.RESUELTA.equals(nuevoEstado)) {
             return new ResultadoOperacion(false, "Estado inválido");

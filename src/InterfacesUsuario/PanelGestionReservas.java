@@ -75,7 +75,8 @@ public class PanelGestionReservas extends JPanel {
         btns[5].addActionListener((e) -> this.abordar());
         btns[6].addActionListener((e) -> this.completar());
 
-        for(JButton b : btns) {
+        // las reservas son de solo lectura: un pasaje comprado es definitivo (no se agrega, edita, elimina ni cancela desde aquí)
+        for(JButton b : new JButton[]{btns[0]}) {
             panelBotones.add(b);
         }
 

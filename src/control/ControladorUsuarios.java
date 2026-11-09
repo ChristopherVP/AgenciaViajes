@@ -19,6 +19,7 @@ import objetosNegocio.Rol;
 import objetosNegocio.Usuario;
 import objetosServicio.ConfiguracionAdmin;
 import objetosServicio.DocumentosConductor;
+import objetosServicio.Permisos;
 import objetosServicio.Fecha;
 import objetosServicio.Seguridad;
 import persistencia.Conductores;
@@ -178,7 +179,8 @@ public class ControladorUsuarios {
     public synchronized ResultadoOperacion registrarConductor(String login, String nombre, String cedula, Fecha nacimiento, String clave,
                                                               String confirmar, String email, String telefono, String idEmpresa,
                                                               String tipoLicencia, String numeroLicencia, Fecha venceLicencia,
-                                                              Map<DocumentosConductor.Tipo, File> documentos, String pregunta, String respuesta) {
+                                                              Map<DocumentosConductor.Tipo, File> documentos, String banco, String numeroTarjeta,
+                                                              String venceTarjeta, String pregunta, String respuesta) {
         try {
             String problema = validarCuenta(login, nombre, cedula, clave, confirmar, email, telefono, pregunta, respuesta, true, null, true);
             if (problema == null) problema = validarMayorDeEdad(nacimiento);
@@ -195,6 +197,7 @@ public class ControladorUsuarios {
                 problema = "El número de licencia debe tener entre 6 y 12 letras o números";
             }
             if (problema == null) problema = errorVencimientoLicencia(venceLicencia);
+            if (problema == null) problema = ControladorTarjetas.validarTarjetaCobro(banco, numeroTarjeta, nombre, venceTarjeta, nombre);
             if (problema == null) {
                 for (DocumentosConductor.Tipo t : DocumentosConductor.Tipo.values()) {
                     File f = documentos == null ? null : documentos.get(t);
@@ -248,6 +251,13 @@ public class ControladorUsuarios {
                 conductores.agrega(ficha);
             }
             try {
+                ResultadoOperacion tarjeta = new ControladorTarjetas().guardarTarjetaCobro(ficha.getIdConductor(), banco, numeroTarjeta, nombre, venceTarjeta);
+                if (!tarjeta.isExito()) {
+                    if (fichaNueva) {
+                        conductores.elimina(ficha);
+                    }
+                    return error(tarjeta.getMensaje());
+                }
                 Usuario u = nuevoUsuario(login, nombre.trim(), ced, clave, email, telefono, Rol.CONDUCTOR, Usuario.ESTADO_PENDIENTE);
                 u.setEmpresa(new Empresa(idEmp));
                 u.setIdPerfil(ficha.getIdConductor());
@@ -647,6 +657,9 @@ public class ControladorUsuarios {
             }
             objetivo.setEstado(Usuario.ESTADO_ACTIVO);
             usuarios.actualiza(objetivo);
+            if (objetivo.getRol() == Rol.CONDUCTOR) {
+                return ok("Conductor aprobado: " + objetivo.getNombre() + ".\nAún NO tiene bus ni ruta asignados: asígnalos en la pestaña Conductores para poder programarle viajes.", objetivo);
+            }
             return ok("Cuenta aprobada: " + objetivo.getNombre(), objetivo);
         } catch (PersistenciaException e) {
             return error(e.getMessage());
@@ -723,6 +736,9 @@ public class ControladorUsuarios {
         }
         if (objetivo == null) {
             return error("Usuario no encontrado");
+        }
+        if (!Permisos.puedeEditar(actor, Permisos.Modulo.USUARIOS)) {
+            return error("Tu cargo no puede aprobar ni modificar usuarios");
         }
         if (!actor.esSuperAdministrador()) {
             boolean mismaEmpresa = objetivo.tieneEmpresa() && objetivo.getEmpresa().getIdEmpresa().equals(actor.getEmpresa().getIdEmpresa());

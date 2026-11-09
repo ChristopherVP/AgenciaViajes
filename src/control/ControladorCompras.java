@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
+import objetosNegocio.Comprobante;
 import objetosNegocio.Empresa;
 import objetosNegocio.Pasajero;
 import objetosNegocio.Reserva;
@@ -166,8 +167,9 @@ public class ControladorCompras {
                 return new ResultadoOperacion(false, "No se pudo confirmar la reserva: " + confirmada.getMensaje());
             }
             Reserva final_ = fachada.obten(new Reserva(reserva.getIdReserva()));
-            return new ResultadoOperacion(true, String.format("¡Compra exitosa! Reserva %s por $%.2f", reserva.getIdReserva(), reserva.getPrecioTotal()),
-                    final_ != null ? final_ : reserva);
+            Comprobante factura = new ControladorFacturacion().emitirPasaje(final_ != null ? final_ : reserva);
+            return new ResultadoOperacion(true, String.format("¡Compra exitosa! Reserva %s por $%.2f%s", reserva.getIdReserva(), reserva.getPrecioTotal(),
+                    factura == null ? "" : ". Factura " + factura.getNumero()), final_ != null ? final_ : reserva);
         } catch (FachadaException e) {
             return new ResultadoOperacion(false, "Error al comprar: " + e.getMessage());
         }
@@ -193,16 +195,8 @@ public class ControladorCompras {
         }
     }
 
-    /** Cancela una reserva propia (regla de 24 h del sistema) y reembolsa a la billetera. */
+    /** Regla del negocio: un pasaje comprado es definitivo, no se cancela ni se devuelve el dinero. */
     public ResultadoOperacion cancelar(String idPasajero, String idReserva) {
-        try {
-            Reserva reserva = fachada.obten(new Reserva(idReserva));
-            if (reserva == null || reserva.getPasajero() == null || !idPasajero.equals(reserva.getPasajero().getIdPasajero())) {
-                return new ResultadoOperacion(false, "Esa reserva no te pertenece");
-            }
-            return reservas.cancelarReserva(idReserva, "Cancelada por el pasajero");
-        } catch (FachadaException e) {
-            return new ResultadoOperacion(false, e.getMessage());
-        }
+        return new ResultadoOperacion(false, "Los pasajes comprados no se pueden cancelar ni se reembolsan");
     }
 }

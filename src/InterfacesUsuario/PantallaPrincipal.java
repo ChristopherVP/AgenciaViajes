@@ -1,16 +1,18 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package InterfacesUsuario;
 
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Container;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
+import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenu;
@@ -19,310 +21,351 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
 import javax.swing.KeyStroke;
-import javax.swing.SwingUtilities;
 import objetosNegocio.Empresa;
-import objetosNegocio.Rol;
 import objetosNegocio.Usuario;
+import objetosServicio.Permisos;
+import objetosServicio.Permisos.Modulo;
 import persistencia.Empresas;
 
+/**
+ * Ventana de la administración. Las pestañas que se muestran dependen del cargo de la persona (cada rol tiene su responsabilidad):
+ * finanzas ve recargas, facturas y pagos; operaciones ve conductores, buses y viajes; etc. En los módulos donde el cargo solo
+ * puede consultar, los botones que modifican datos se ocultan. Cada pestaña tiene búsqueda en vivo.
+ */
 public class PantallaPrincipal extends JFrame {
-    private Usuario usuarioActual;
+    private static final class Pestana {
+        final String titulo;
+        final String ayuda;
+        final Modulo modulo;
+        final Color color;
+        final Supplier<JPanel> fabrica;
+        final boolean sinAgregar;
+        final boolean soloLectura;
+
+        Pestana(String titulo, String ayuda, Modulo modulo, Color color, Supplier<JPanel> fabrica, boolean sinAgregar, boolean soloLectura) {
+            this.titulo = titulo;
+            this.ayuda = ayuda;
+            this.modulo = modulo;
+            this.color = color;
+            this.fabrica = fabrica;
+            this.sinAgregar = sinAgregar;
+            this.soloLectura = soloLectura;
+        }
+    }
+
+    /** Botones que modifican datos: se ocultan donde el cargo solo puede consultar. */
+    private static final String[] BOTONES_QUE_MODIFICAN = {"agregar", "editar", "eliminar", "nuevo", "aprobar", "rechazar", "revisar", "responder",
+            "asignar", "quitar", "pagar", "abordar", "completar", "cancelar", "facturar"};
+
+    private final Usuario usuarioActual;
     private Empresa empresaActual;
     private JMenuBar menuBar;
     private JTabbedPane tabbedPane;
-    private InterfacesUsuario.PanelGestionBuses panelBuses;
-    private InterfacesUsuario.PanelGestionRutas panelRutas;
-    private InterfacesUsuario.PanelGestionViajes panelViajes;
-    private InterfacesUsuario.PanelGestionReservas panelReservas;
-    private InterfacesUsuario.PanelGestionFacturas panelFacturas;
-    private InterfacesUsuario.PanelGestionPasajeros panelPasajeros;
-    private InterfacesUsuario.PanelGestionConductores panelConductores;
+    private PanelGestionBuses panelBuses;
+    private PanelGestionRutas panelRutas;
+    private PanelGestionViajes panelViajes;
+    private PanelGestionReservas panelReservas;
+    private PanelGestionPasajeros panelPasajeros;
+    private PanelGestionConductores panelConductores;
 
     public PantallaPrincipal(Usuario usuario) {
         this.usuarioActual = usuario;
-        this.initComponents();
+        initComponents();
+    }
+
+    private List<Pestana> definirPestanas() {
+        List<Pestana> p = new ArrayList<>();
+        p.add(new Pestana("Empresas", "Empresas de transporte", Modulo.EMPRESAS, new Color(220, 220, 220), () -> new PanelGestionEmpresas(usuarioActual), false, false));
+        p.add(new Pestana("Usuarios", "Administradores y aprobación de conductores", Modulo.USUARIOS, new Color(230, 230, 250), () -> new PanelGestionUsuarios(usuarioActual), false, false));
+        p.add(new Pestana("Conductores", "Conductores, bus y ruta asignados", Modulo.CONDUCTORES, new Color(255, 215, 0), () -> {
+            panelConductores = new PanelGestionConductores(usuarioActual);
+            return panelConductores;
+        }, true, false));
+        p.add(new Pestana("Pasajeros", "Pasajeros registrados", Modulo.PASAJEROS, new Color(255, 228, 196), () -> {
+            panelPasajeros = new PanelGestionPasajeros();
+            return panelPasajeros;
+        }, true, false));
+        p.add(new Pestana("Buses", "Flota de buses", Modulo.BUSES, new Color(173, 216, 230), () -> {
+            panelBuses = new PanelGestionBuses();
+            return panelBuses;
+        }, false, false));
+        p.add(new Pestana("Rutas", "Rutas directas entre ciudades", Modulo.RUTAS, new Color(152, 251, 152), () -> {
+            panelRutas = new PanelGestionRutas();
+            return panelRutas;
+        }, false, false));
+        p.add(new Pestana("Viajes", "Viajes programados", Modulo.VIAJES, new Color(255, 255, 224), () -> {
+            panelViajes = new PanelGestionViajes(usuarioActual);
+            return panelViajes;
+        }, false, false));
+        p.add(new Pestana("Reservas", "Pasajes comprados (solo consulta: la compra es definitiva)", Modulo.RESERVAS, new Color(255, 182, 193), () -> {
+            panelReservas = new PanelGestionReservas();
+            return panelReservas;
+        }, false, true));
+        p.add(new Pestana("Facturas", "Facturas de todos los movimientos de dinero", Modulo.FACTURAS, new Color(224, 255, 255),
+                () -> new PanelFacturacion(usuarioActual, true), false, true));
+        p.add(new Pestana("Novedades", "Reportes, quejas y sugerencias de conductores y pasajeros", Modulo.NOVEDADES, new Color(255, 240, 200),
+                () -> new PanelNovedadesAdmin(usuarioActual), false, false));
+        p.add(new Pestana("Recargas", "Recargas de billetera (el efectivo lo aprueba finanzas)", Modulo.RECARGAS, new Color(200, 240, 200),
+                () -> new PanelRecargasAdmin(usuarioActual), false, false));
+        p.add(new Pestana("Pagos a conductores", "80 % de lo recaudado por cada viaje realizado", Modulo.PAGOS, new Color(255, 210, 170),
+                () -> new PanelPagosConductores(usuarioActual), false, false));
+        return p;
     }
 
     private void initComponents() {
-        this.setTitle("RQ - Sistema de Transporte Interprovincial - " + this.usuarioActual.getNombre() + " (" + this.usuarioActual.getTipo() + ")");
-        this.setDefaultCloseOperation(3);
-        this.setSize(1200, 700);
-        this.setExtendedState(6);
-        this.setLocationRelativeTo((Component)null);
-        this.crearMenu();
-        this.tabbedPane = new JTabbedPane();
-        this.tabbedPane.setFont(new Font("Arial", 1, 14));
-        this.tabbedPane.setOpaque(true);
-        this.tabbedPane.addTab("Empresas", (Icon)null, this.createEmpresasPanel(), "Gestión de Empresas");
-        this.tabbedPane.addTab("Usuarios", (Icon)null, this.createUsuariosPanel(), "Gestión de Usuarios");
-        this.panelConductores = new InterfacesUsuario.PanelGestionConductores();
-        this.tabbedPane.addTab("Conductores", (Icon)null, this.panelConductores, "Gestión de Conductores");
-        this.tabbedPane.addTab("Pasajeros", (Icon)null, this.createPasajerosPanel(), "Gestión de Pasajeros");
-        this.tabbedPane.addTab("Buses", (Icon)null, this.createBusesPanel(), "Gestión de Buses");
-        this.tabbedPane.addTab("Rutas", (Icon)null, this.createRutasPanel(), "Gestión de Rutas");
-        this.tabbedPane.addTab("Viajes", (Icon)null, this.createViajesPanel(), "Gestión de Viajes");
-        this.tabbedPane.addTab("Reservas", (Icon)null, this.createReservasPanel(), "Gestión de Reservas");
-        this.tabbedPane.addTab("Facturas", (Icon)null, this.createFacturasPanel(), "Gestión de Facturas");
-        if (this.usuarioActual.getRol() == Rol.ADMINISTRADOR) {
-            this.tabbedPane.addTab("Novedades", (Icon)null, new InterfacesUsuario.PanelNovedadesAdmin(this.usuarioActual), "Reportes enviados por los conductores");
-            if (this.usuarioActual.esSuperAdministrador()) {
-                this.tabbedPane.addTab("Recargas", (Icon)null, new InterfacesUsuario.PanelRecargasAdmin(this.usuarioActual), "Aprobación de recargas de pasajeros");
+        setTitle("RQ - Sistema de Transporte Interprovincial - " + usuarioActual.getNombre() + " (" + usuarioActual.getTipo() + ")");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1200, 700);
+        setExtendedState(MAXIMIZED_BOTH);
+        setLocationRelativeTo(null);
+        crearMenu();
+        tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Arial", Font.BOLD, 14));
+        tabbedPane.setOpaque(true);
+
+        Set<Modulo> edita = Permisos.edita(usuarioActual);
+        for (Pestana pestana : definirPestanas()) {
+            if (!Permisos.puedeVer(usuarioActual, pestana.modulo)) {
+                continue;
             }
+            JPanel contenido = pestana.fabrica.get();
+            boolean puedeEditar = edita.contains(pestana.modulo) && !pestana.soloLectura;
+            tabbedPane.addTab(pestana.titulo, (Icon) null, envolver(contenido, pestana.sinAgregar, !puedeEditar), pestana.ayuda);
+            tabbedPane.setBackgroundAt(tabbedPane.getTabCount() - 1, pestana.color);
         }
-        this.tabbedPane.setBackgroundAt(0, new Color(220, 220, 220));
-        this.tabbedPane.setBackgroundAt(1, new Color(230, 230, 250));
-        this.tabbedPane.setBackgroundAt(2, new Color(255, 215, 0));
-        this.tabbedPane.setBackgroundAt(3, new Color(255, 228, 196));
-        this.tabbedPane.setBackgroundAt(4, new Color(173, 216, 230));
-        this.tabbedPane.setBackgroundAt(5, new Color(152, 251, 152));
-        this.tabbedPane.setBackgroundAt(6, new Color(255, 255, 224));
-        this.tabbedPane.setBackgroundAt(7, new Color(255, 182, 193));
-        this.tabbedPane.setBackgroundAt(8, new Color(224, 255, 255));
-        if (this.usuarioActual.getEmpresa() != null) {
+        Tema.pestanas(tabbedPane);
+
+        if (usuarioActual.getEmpresa() != null) {
             try {
-                Empresas dao = new Empresas("empresas.dat");
-                Empresa empCompleta = dao.obten(this.usuarioActual.getEmpresa());
-                if (empCompleta != null) {
-                    this.usuarioActual.setEmpresa(empCompleta);
+                Empresa completa = new Empresas("empresas.dat").obten(usuarioActual.getEmpresa());
+                if (completa != null) {
+                    usuarioActual.setEmpresa(completa);
                 }
-            } catch (Exception var3) {
+            } catch (Exception ignorado) {
+                // se sigue con los datos básicos de la empresa
             }
-
-            if ("Operador".equalsIgnoreCase(this.usuarioActual.getTipo())) {
-                this.bloquearModulos();
+            if ("Operador".equalsIgnoreCase(usuarioActual.getTipo())) {
+                bloquearModulos();
             } else {
-                this.desbloquearModulos(this.usuarioActual.getEmpresa());
+                desbloquearModulos(usuarioActual.getEmpresa());
             }
-        } else if (this.usuarioActual != null && "Administrador".equalsIgnoreCase(this.usuarioActual.getTipo())) {
-            this.setTitle("Sistema de Transporte - Usuario: " + this.usuarioActual.getIdUsuario() + " | SUPER ADMINISTRADOR");
-
-            for(int i = 1; i < this.tabbedPane.getTabCount(); ++i) {
-                this.tabbedPane.setEnabledAt(i, true);
+        } else if ("Administrador".equalsIgnoreCase(usuarioActual.getTipo())) {
+            String cargo = usuarioActual.getCargo() == null || usuarioActual.getCargo().isEmpty() ? "ADMINISTRADOR" : usuarioActual.getCargo().toUpperCase();
+            setTitle("Sistema de Transporte - Usuario: " + usuarioActual.getIdUsuario() + " | " + cargo);
+            for (int i = 0; i < tabbedPane.getTabCount(); ++i) {
+                tabbedPane.setEnabledAt(i, true);
             }
         } else {
-            this.bloquearModulos();
+            bloquearModulos();
         }
 
-        this.add(this.tabbedPane, "Center");
-        JPanel panelInferior = new JPanel(new FlowLayout(0));
-        panelInferior.setBorder(BorderFactory.createEtchedBorder());
-        JLabel lblInfo = new JLabel("Sistema de Gestión de Buses v2.0 | Usuario: " + this.usuarioActual.getIdUsuario());
-        lblInfo.setFont(new Font("Arial", 0, 11));
-        panelInferior.add(lblInfo);
-        this.add(panelInferior, "South");
+        List<JButton> extras = new ArrayList<>();
+        JButton pdf = Tema.boton("Guardar en PDF", false);
+        pdf.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.PDF));
+        JButton excel = Tema.boton("Guardar en Excel", false);
+        excel.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.EXCEL));
+        extras.add(pdf);
+        extras.add(excel);
+        if (Permisos.puedeVer(usuarioActual, Modulo.REPORTES)) {
+            JButton informes = Tema.boton("Informes PDF", false);
+            informes.addActionListener(e -> abrirInformes());
+            extras.add(informes);
+        }
+        add(BarraSuperior.crear(this, usuarioActual, null, null, extras.toArray(new JButton[0])), BorderLayout.NORTH);
+        add(tabbedPane, BorderLayout.CENTER);
+        JPanel inferior = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        inferior.setBorder(BorderFactory.createEtchedBorder());
+        JLabel info = new JLabel("Sistema de Gestión de Buses v2.0 | Usuario: " + usuarioActual.getIdUsuario());
+        info.setFont(new Font("Arial", Font.PLAIN, 11));
+        inferior.add(info);
+        add(inferior, BorderLayout.SOUTH);
     }
 
-    public void bloquearModulos() {
-        this.empresaActual = null;
-
-        for(int i = 1; i < this.tabbedPane.getTabCount(); ++i) {
-            this.tabbedPane.setEnabledAt(i, false);
-            this.tabbedPane.setBackgroundAt(i, Color.LIGHT_GRAY);
+    private int indiceDe(String titulo) {
+        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+            if (tabbedPane.getTitleAt(i).equals(titulo)) {
+                return i;
+            }
         }
+        return -1;
+    }
 
-        this.tabbedPane.setSelectedIndex(0);
-        this.setTitle("Sistema de Transporte - Usuario: " + this.usuarioActual.getIdUsuario() + " | Seleccione una Empresa");
+    /** Operador sin empresa elegida: solo la pestaña Empresas está disponible. */
+    public void bloquearModulos() {
+        empresaActual = null;
+        int empresas = indiceDe("Empresas");
+        for (int i = 0; i < tabbedPane.getTabCount(); ++i) {
+            if (i != empresas) {
+                tabbedPane.setEnabledAt(i, false);
+                tabbedPane.setBackgroundAt(i, Color.LIGHT_GRAY);
+            }
+        }
+        if (empresas >= 0) {
+            tabbedPane.setSelectedIndex(empresas);
+        }
+        setTitle("Sistema de Transporte - Usuario: " + usuarioActual.getIdUsuario() + " | Seleccione una Empresa");
     }
 
     public void desbloquearModulos(Empresa empresa) {
-        this.empresaActual = empresa;
-        if (this.panelBuses != null) {
-            this.panelBuses.setEmpresaFiltro(empresa);
+        empresaActual = empresa;
+        if (panelBuses != null) panelBuses.setEmpresaFiltro(empresa);
+        if (panelRutas != null) panelRutas.setEmpresaFiltro(empresa);
+        if (panelViajes != null) panelViajes.setEmpresaFiltro(empresa);
+        if (panelReservas != null) panelReservas.setEmpresaFiltro(empresa);
+        if (panelPasajeros != null) panelPasajeros.setEmpresaFiltro(empresa);
+        if (panelConductores != null) panelConductores.setEmpresaFiltro(empresa);
+        for (Pestana p : definirColores()) {
+            int i = indiceDe(p.titulo);
+            if (i >= 0) {
+                tabbedPane.setEnabledAt(i, true);
+                tabbedPane.setBackgroundAt(i, p.color);
+            }
         }
-
-        if (this.panelRutas != null) {
-            this.panelRutas.setEmpresaFiltro(empresa);
-        }
-
-        if (this.panelViajes != null) {
-            this.panelViajes.setEmpresaFiltro(empresa);
-        }
-
-        if (this.panelReservas != null) {
-            this.panelReservas.setEmpresaFiltro(empresa);
-        }
-
-        if (this.panelFacturas != null) {
-            this.panelFacturas.setEmpresaFiltro(empresa);
-        }
-
-        if (this.panelPasajeros != null) {
-            this.panelPasajeros.setEmpresaFiltro(empresa);
-        }
-
-        if (this.panelConductores != null) {
-            this.panelConductores.setEmpresaFiltro(empresa);
-        }
-
-        for(int i = 1; i < this.tabbedPane.getTabCount(); ++i) {
-            this.tabbedPane.setEnabledAt(i, true);
-        }
-
-        this.tabbedPane.setBackgroundAt(1, new Color(230, 230, 250));
-        this.tabbedPane.setBackgroundAt(2, new Color(255, 215, 0));
-        this.tabbedPane.setBackgroundAt(3, new Color(255, 228, 196));
-        this.tabbedPane.setBackgroundAt(4, new Color(173, 216, 230));
-        this.tabbedPane.setBackgroundAt(5, new Color(152, 251, 152));
-        this.tabbedPane.setBackgroundAt(6, new Color(255, 255, 224));
-        this.tabbedPane.setBackgroundAt(7, new Color(255, 182, 193));
-        this.tabbedPane.setBackgroundAt(8, new Color(224, 255, 255));
-        String nombreEmpresa = empresa.getNombre() != null ? empresa.getNombre() : empresa.getIdEmpresa();
-        String var10001 = this.usuarioActual.getIdUsuario();
-        this.setTitle("Sistema de Transporte - Usuario: " + var10001 + " | Empresa: " + nombreEmpresa);
-        this.tabbedPane.setSelectedIndex(1);
-        JLabel lblMensaje = new JLabel("Acceso concedido a: " + nombreEmpresa);
-        lblMensaje.setFont(new Font("Arial", 1, 18));
-        JOptionPane.showMessageDialog(this, lblMensaje, "Bienvenido", 1);
+        String nombre = empresa.getNombre() != null ? empresa.getNombre() : empresa.getIdEmpresa();
+        setTitle("Sistema de Transporte - Usuario: " + usuarioActual.getIdUsuario() + " | Empresa: " + nombre);
+        int siguiente = Math.min(1, tabbedPane.getTabCount() - 1);
+        tabbedPane.setSelectedIndex(siguiente);
+        JLabel mensaje = new JLabel("Acceso concedido a: " + nombre);
+        mensaje.setFont(new Font("Arial", Font.BOLD, 18));
+        JOptionPane.showMessageDialog(this, mensaje, "Bienvenido", JOptionPane.INFORMATION_MESSAGE);
     }
+
+    private List<Pestana> definirColores() {
+        List<Pestana> lista = new ArrayList<>();
+        for (Pestana p : definirPestanasSinFabricar()) {
+            lista.add(p);
+        }
+        return lista;
+    }
+
+    private List<Pestana> definirPestanasSinFabricar() {
+        List<Pestana> p = new ArrayList<>();
+        String[] titulos = {"Empresas", "Usuarios", "Conductores", "Pasajeros", "Buses", "Rutas", "Viajes", "Reservas", "Facturas", "Novedades", "Recargas", "Pagos a conductores"};
+        Color[] colores = {new Color(220, 220, 220), new Color(230, 230, 250), new Color(255, 215, 0), new Color(255, 228, 196), new Color(173, 216, 230),
+                new Color(152, 251, 152), new Color(255, 255, 224), new Color(255, 182, 193), new Color(224, 255, 255), new Color(255, 240, 200),
+                new Color(200, 240, 200), new Color(255, 210, 170)};
+        for (int i = 0; i < titulos.length; i++) {
+            p.add(new Pestana(titulos[i], "", Modulo.EMPRESAS, colores[i], null, false, false));
+        }
+        return p;
+    }
+
+    // ------------------------------------------------------------------ menú y barra
 
     private void crearMenu() {
-        this.menuBar = new JMenuBar();
-        JMenu menuGestion = new JMenu("Gestión");
-        menuGestion.setMnemonic(71);
-        JMenuItem itemEmpresas = new JMenuItem("Empresas", 77);
-        itemEmpresas.setAccelerator(KeyStroke.getKeyStroke(77, 128));
-        itemEmpresas.addActionListener((e) -> this.tabbedPane.setSelectedIndex(0));
-        menuGestion.add(itemEmpresas);
-        JMenuItem itemUsuarios = new JMenuItem("Usuarios", 85);
-        itemUsuarios.setAccelerator(KeyStroke.getKeyStroke(85, 128));
-        itemUsuarios.addActionListener((e) -> this.navegarSiHabilitado(1));
-        menuGestion.add(itemUsuarios);
-        JMenuItem itemBuses = new JMenuItem("Buses", 66);
-        itemBuses.setAccelerator(KeyStroke.getKeyStroke(66, 128));
-        itemBuses.addActionListener((e) -> this.navegarSiHabilitado(4));
-        menuGestion.add(itemBuses);
-        JMenuItem itemRutas = new JMenuItem("Rutas", 82);
-        itemRutas.setAccelerator(KeyStroke.getKeyStroke(82, 128));
-        itemRutas.addActionListener((e) -> this.navegarSiHabilitado(5));
-        menuGestion.add(itemRutas);
-        JMenuItem itemViajes = new JMenuItem("Viajes", 86);
-        itemViajes.setAccelerator(KeyStroke.getKeyStroke(86, 128));
-        itemViajes.addActionListener((e) -> this.navegarSiHabilitado(6));
-        menuGestion.add(itemViajes);
-        JMenuItem itemPasajeros = new JMenuItem("Pasajeros", 74);
-        itemPasajeros.setAccelerator(KeyStroke.getKeyStroke(74, 128));
-        itemPasajeros.addActionListener((e) -> this.navegarSiHabilitado(3));
-        menuGestion.add(itemPasajeros);
-        JMenuItem itemReservas = new JMenuItem("Reservas", 69);
-        itemReservas.setAccelerator(KeyStroke.getKeyStroke(69, 128));
-        itemReservas.addActionListener((e) -> this.navegarSiHabilitado(7));
-        menuGestion.add(itemReservas);
-        JMenuItem itemFacturas = new JMenuItem("Facturas", 70);
-        itemFacturas.setAccelerator(KeyStroke.getKeyStroke(70, 128));
-        itemFacturas.addActionListener((e) -> this.navegarSiHabilitado(8));
-        menuGestion.add(itemFacturas);
-        menuGestion.addSeparator();
-        JMenuItem itemSalir = new JMenuItem("Salir", 83);
-        itemSalir.setAccelerator(KeyStroke.getKeyStroke(81, 128));
-        itemSalir.addActionListener((e) -> {
-            int opcion = JOptionPane.showConfirmDialog(this, "¿Está seguro que desea salir?", "Confirmar salida", 0);
-            if (opcion == 0) {
-                System.exit(0);
-            }
-
-        });
-        menuGestion.add(itemSalir);
-        JMenu menuConsultas = new JMenu("Consultas");
-        menuConsultas.setMnemonic(67);
-        JMenuItem itemConsultasEspeciales = new JMenuItem("Consultas Especiales");
-        itemConsultasEspeciales.setAccelerator(KeyStroke.getKeyStroke(75, 128));
-        itemConsultasEspeciales.addActionListener((e) -> this.abrirConsultasEspeciales());
-        menuConsultas.add(itemConsultasEspeciales);
-        JMenu menuReportes = new JMenu("Reportes");
-        menuReportes.setMnemonic(80);
-        JMenuItem itemReportes = new JMenuItem("Reportes y Estadísticas");
-        itemReportes.setAccelerator(KeyStroke.getKeyStroke(80, 128));
-        itemReportes.addActionListener((e) -> this.abrirReportes());
-        menuReportes.add(itemReportes);
-        JMenu menuAyuda = new JMenu("Ayuda");
-        menuAyuda.setMnemonic(65);
-        JMenuItem itemManual = new JMenuItem("Manual de Usuario");
-        itemManual.setAccelerator(KeyStroke.getKeyStroke(112, 0));
-        itemManual.addActionListener((e) -> this.abrirManualUsuario());
-        menuAyuda.add(itemManual);
-        JMenuItem itemAcercaDe = new JMenuItem("Acerca de");
-        itemAcercaDe.addActionListener((e) -> this.mostrarAcercaDe());
-        menuAyuda.add(itemAcercaDe);
-        this.menuBar.add(menuGestion);
-        this.menuBar.add(menuConsultas);
-        this.menuBar.add(menuReportes);
-        this.menuBar.add(menuAyuda);
-        JMenu menuCuenta = new JMenu("Cuenta");
-        menuCuenta.setMnemonic(78);
-        JMenuItem itemPerfil = new JMenuItem("Mi perfil");
-        itemPerfil.addActionListener((e) -> (new InterfacesUsuario.DialogoPerfil(this, this.usuarioActual, () -> { })).setVisible(true));
-        menuCuenta.add(itemPerfil);
-        JMenuItem itemCerrar = new JMenuItem("Cerrar sesión");
-        itemCerrar.addActionListener((e) -> InterfacesUsuario.Navegador.cerrarSesion(this));
-        menuCuenta.add(itemCerrar);
-        this.menuBar.add(menuCuenta);
-        this.setJMenuBar(this.menuBar);
-    }
-
-    private void navegarSiHabilitado(int index) {
-        if (this.tabbedPane.isEnabledAt(index)) {
-            this.tabbedPane.setSelectedIndex(index);
-        } else {
-            JOptionPane.showMessageDialog(this, "Debe acceder a una empresa primero.", "Acceso Restringido", 2);
+        menuBar = new JMenuBar();
+        JMenu consultas = new JMenu("Consultas");
+        consultas.setMnemonic('C');
+        JMenuItem especiales = new JMenuItem("Consultas Especiales");
+        especiales.setAccelerator(KeyStroke.getKeyStroke('K', java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        especiales.addActionListener(e -> new PantallaConsultasEspeciales(this, empresaActual).setVisible(true));
+        consultas.add(especiales);
+        JMenu reportes = new JMenu("Reportes");
+        reportes.setMnemonic('P');
+        if (Permisos.puedeVer(usuarioActual, Modulo.REPORTES)) {
+            JMenuItem estadisticas = new JMenuItem("Reportes y Estadísticas");
+            estadisticas.setAccelerator(KeyStroke.getKeyStroke('P', java.awt.event.InputEvent.CTRL_DOWN_MASK));
+            estadisticas.addActionListener(e -> new PantallaReportes(this, empresaActual).setVisible(true));
+            reportes.add(estadisticas);
+            JMenuItem informes = new JMenuItem("Informes formales en PDF...");
+            informes.addActionListener(e -> abrirInformes());
+            reportes.add(informes);
+            reportes.addSeparator();
         }
-
+        JMenuItem pdf = new JMenuItem("Guardar la pestaña actual en PDF");
+        pdf.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.PDF));
+        reportes.add(pdf);
+        JMenuItem excel = new JMenuItem("Guardar la pestaña actual en Excel");
+        excel.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.EXCEL));
+        reportes.add(excel);
+        JMenu ayuda = new JMenu("Ayuda");
+        ayuda.setMnemonic('A');
+        JMenuItem manual = new JMenuItem("Manual de Usuario");
+        manual.setAccelerator(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_F1, 0));
+        manual.addActionListener(e -> new PantallaManualUsuario(this).setVisible(true));
+        ayuda.add(manual);
+        JMenuItem acerca = new JMenuItem("Acerca de");
+        acerca.addActionListener(e -> JOptionPane.showMessageDialog(this, "Sistema de Transporte Interprovincial\nVersión 2.0\n\nSistema integral de gestión de transporte de pasajeros\n"
+                + "Buses, rutas, viajes, reservas, facturación y pagos a conductores.\n\n© 2026 - Todos los derechos reservados", "Acerca del Sistema", JOptionPane.INFORMATION_MESSAGE));
+        ayuda.add(acerca);
+        JMenu cuenta = new JMenu("Cuenta");
+        cuenta.setMnemonic('N');
+        JMenuItem perfil = new JMenuItem("Mi perfil");
+        perfil.addActionListener(e -> new DialogoPerfil(this, usuarioActual, () -> { }).setVisible(true));
+        cuenta.add(perfil);
+        JMenuItem cerrar = new JMenuItem("Cerrar sesión");
+        cerrar.addActionListener(e -> Navegador.cerrarSesion(this));
+        cuenta.add(cerrar);
+        menuBar.add(consultas);
+        menuBar.add(reportes);
+        menuBar.add(ayuda);
+        menuBar.add(cuenta);
+        setJMenuBar(menuBar);
     }
 
-    private JPanel createBusesPanel() {
-        this.panelBuses = new InterfacesUsuario.PanelGestionBuses();
-        return this.panelBuses;
+    private void abrirInformes() {
+        new DialogoInformes(this, usuarioActual).setVisible(true);
     }
 
-    private JPanel createRutasPanel() {
-        this.panelRutas = new InterfacesUsuario.PanelGestionRutas();
-        return this.panelRutas;
+    /** Guarda lo que se ve en la tabla de la pestaña elegida (incluida la búsqueda aplicada). */
+    private void exportarPestana(ExportadorTabla.Formato formato) {
+        int i = tabbedPane.getSelectedIndex();
+        if (i < 0) {
+            return;
+        }
+        JTable tabla = ExportadorTabla.buscarTabla(tabbedPane.getComponentAt(i));
+        ExportadorTabla.exportar(this, tabla, "Listado de " + tabbedPane.getTitleAt(i), formato);
     }
 
-    private JPanel createViajesPanel() {
-        this.panelViajes = new InterfacesUsuario.PanelGestionViajes(this.usuarioActual);
-        return this.panelViajes;
+    // ------------------------------------------------------------------ pestañas
+
+    private Component envolver(JPanel contenido, boolean sinAgregar, boolean soloConsulta) {
+        JTable tabla = ExportadorTabla.buscarTabla(contenido);
+        if (tabla == null) {
+            return contenido;
+        }
+        Tema.encabezadoLegible(tabla);
+        ocultarControles(contenido, sinAgregar, soloConsulta);
+        BarraBusqueda barra = BarraBusqueda.para(tabla);
+        if (barra == null) {
+            return contenido;
+        }
+        JPanel envoltura = new JPanel(new BorderLayout());
+        envoltura.setOpaque(false);
+        envoltura.add(barra, BorderLayout.NORTH);
+        envoltura.add(contenido, BorderLayout.CENTER);
+        return envoltura;
     }
 
-    private JPanel createReservasPanel() {
-        this.panelReservas = new InterfacesUsuario.PanelGestionReservas();
-        return this.panelReservas;
-    }
-
-    private JPanel createFacturasPanel() {
-        this.panelFacturas = new InterfacesUsuario.PanelGestionFacturas(this.usuarioActual);
-        return this.panelFacturas;
-    }
-
-    private JPanel createUsuariosPanel() {
-        return new InterfacesUsuario.PanelGestionUsuarios(this.usuarioActual);
-    }
-
-    private JPanel createPasajerosPanel() {
-        this.panelPasajeros = new InterfacesUsuario.PanelGestionPasajeros();
-        return this.panelPasajeros;
-    }
-
-    private JPanel createEmpresasPanel() {
-        return new InterfacesUsuario.PanelGestionEmpresas(this.usuarioActual);
-    }
-
-    private void abrirConsultasEspeciales() {
-        InterfacesUsuario.PantallaConsultasEspeciales consultas = new InterfacesUsuario.PantallaConsultasEspeciales(this, this.empresaActual);
-        consultas.setVisible(true);
-    }
-
-    private void abrirReportes() {
-        PantallaReportes reportes = new PantallaReportes(this, this.empresaActual);
-        reportes.setVisible(true);
-    }
-
-    private void abrirManualUsuario() {
-        InterfacesUsuario.PantallaManualUsuario manual = new InterfacesUsuario.PantallaManualUsuario(this);
-        manual.setVisible(true);
-    }
-
-    private void mostrarAcercaDe() {
-        JOptionPane.showMessageDialog(this, "Sistema de Transporte Interprovincial\nVersión 2.0\n\nSistema integral de gestión de transporte de pasajeros\nDesarrollado para la administración eficiente de buses,\nrutas, viajes, reservas y facturación.\n\n© 2026 - Todos los derechos reservados", "Acerca del Sistema", 1);
+    /**
+     * Quita los botones y cuadros "Buscar" de cada módulo (los reemplaza la barra general), el botón Agregar donde las cuentas
+     * se crean solas y los botones que modifican datos donde el cargo solo puede consultar.
+     */
+    private void ocultarControles(Component c, boolean sinAgregar, boolean soloConsulta) {
+        if (c instanceof JButton boton) {
+            String texto = boton.getText() == null ? "" : boton.getText().trim().toLowerCase();
+            boolean modifica = false;
+            for (String clave : BOTONES_QUE_MODIFICAN) {
+                modifica |= texto.startsWith(clave);
+            }
+            if (texto.equals("buscar") || (sinAgregar && texto.equals("agregar")) || (soloConsulta && modifica)) {
+                boton.setVisible(false);
+            }
+        } else if (c instanceof JTextField campo) {
+            Object ayuda = campo.getClientProperty("JTextField.placeholderText");
+            if (ayuda != null && ayuda.toString().startsWith("Buscar")) {
+                campo.setVisible(false);
+            }
+        } else if (c instanceof JLabel etiqueta && "\ud83d\udd0d".equals(etiqueta.getText())) {
+            etiqueta.setVisible(false);
+        }
+        if (c instanceof Container contenedor) {
+            for (Component hijo : contenedor.getComponents()) {
+                ocultarControles(hijo, sinAgregar, soloConsulta);
+            }
+        }
     }
 }
