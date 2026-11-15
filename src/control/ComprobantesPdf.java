@@ -140,6 +140,40 @@ public class ComprobantesPdf {
         }
     }
 
+    // ------------------------------------------------------------------ reportes (novedades)
+
+    /** Reporte de un conductor o pasajero al administrador, con su respuesta si ya la tiene. */
+    public void novedad(File destino, objetosNegocio.Novedad n) throws IOException {
+        try {
+            String remitente = n.getIdConductor();
+            String rol = "Pasajero";
+            objetosNegocio.Conductor c = new persistencia.Conductores("conductores.dat").obten(new Conductor(n.getIdConductor()));
+            if (c != null) {
+                remitente = c.getNombre();
+                rol = "Conductor";
+            } else {
+                Pasajero p = new persistencia.Pasajeros("pasajeros.dat").obten(new Pasajero(n.getIdConductor()));
+                remitente = p == null ? remitente : p.getNombre();
+            }
+            String viaje = n.getIdViaje() == null || n.getIdViaje().isEmpty() ? "Sin viaje específico" : n.getIdViaje();
+            String fecha = n.getFecha() == null ? "" : String.format("%02d/%02d/%04d", n.getFecha().getDia(), n.getFecha().getMes(), n.getFecha().getAnio())
+                    + " " + n.getHora();
+            String tipo = ControladorNovedades.TIPOS.getOrDefault(n.getTipo(), n.getTipo());
+            Documento d = new Documento("Reporte al administrador", n.getIdNovedad(), fecha)
+                    .estado(n.getEstado() == null ? "" : n.getEstado())
+                    .bloque("Remitente", "Nombre", remitente, "Rol", rol, "Código", n.getIdConductor())
+                    .bloque("Reporte", "Tipo", tipo, "Viaje relacionado", viaje, "Asunto", n.getAsunto(), "Enviado", fecha)
+                    .bloque("Mensaje", "Detalle", n.getMensaje())
+                    .bloque("Respuesta del administrador", "Estado", n.getEstado(),
+                            "Respuesta", n.getRespuesta() == null || n.getRespuesta().isEmpty() ? "Aún sin respuesta" : n.getRespuesta(),
+                            "Atendido por", n.getIdRevisor() == null || n.getIdRevisor().isEmpty() ? "—" : n.getIdRevisor())
+                    .pie("Documento generado por " + Marca.NOMBRE + ".");
+            InformePdf.guardarDocumento(destino, d);
+        } catch (excepciones.PersistenciaException e) {
+            throw new IOException("No se pudo leer el reporte: " + e.getMessage(), e);
+        }
+    }
+
     // ------------------------------------------------------------------ billetera
 
     public void movimiento(File destino, Movimiento m) throws IOException {

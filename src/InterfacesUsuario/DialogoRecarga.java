@@ -53,7 +53,7 @@ public class DialogoRecarga extends JDialog {
         super(padre, "Solicitar recarga", Dialog.ModalityType.APPLICATION_MODAL);
         this.usuario = usuario;
         this.alEnviar = alEnviar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Recargar billetera", "Tu recarga será revisada por el administrador"), BorderLayout.NORTH);
 

@@ -2,12 +2,12 @@ package objetosServicio;
 
 /**
  * Datos de la cuenta del administrador principal que el sistema crea por sí solo la primera vez.
- * Se pueden cambiar con las variables de entorno RQ_ADMIN_USUARIO y RQ_ADMIN_PASSWORD.
+ * Se pueden cambiar con las variables de entorno RUTAVIVA_ADMIN_USUARIO y RUTAVIVA_ADMIN_PASSWORD.
  * Si no existen, se usa una contraseña TEMPORAL que obliga a cambiarla en el primer ingreso.
  */
 public final class ConfiguracionAdmin {
-    public static final String VARIABLE_USUARIO = "RQ_ADMIN_USUARIO";
-    public static final String VARIABLE_PASSWORD = "RQ_ADMIN_PASSWORD";
+    public static final String VARIABLE_USUARIO = "RUTAVIVA_ADMIN_USUARIO";
+    public static final String VARIABLE_PASSWORD = "RUTAVIVA_ADMIN_PASSWORD";
 
     public static final String USUARIO_POR_DEFECTO = "admin";
     public static final String NOMBRE_ADMIN = "Administrador Principal";

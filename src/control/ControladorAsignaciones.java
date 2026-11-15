@@ -116,6 +116,19 @@ public class ControladorAsignaciones {
         }
     }
 
+    /** Cambia solo el bus de la asignación (conserva la ruta). Lo usa el despacho al reemplazar un bus averiado; quien llama ya validó permisos. */
+    synchronized void cambiarBus(String idConductor, String idBusNuevo) throws IOException {
+        List<String[]> filas = new ArrayList<>();
+        for (String[] f : ALMACEN.leer()) {
+            if (f[0].equals(idConductor)) {
+                filas.add(new String[]{f[0], idBusNuevo, f.length > 2 ? f[2] : ""});
+            } else {
+                filas.add(f);
+            }
+        }
+        ALMACEN.reescribir(filas);
+    }
+
     public synchronized ResultadoOperacion quitar(Usuario actor, String idConductor) {
         if (!Permisos.puedeEditar(actor, Permisos.Modulo.CONDUCTORES)) {
             return new ResultadoOperacion(false, "Tu cargo no puede cambiar las asignaciones");

@@ -12,9 +12,9 @@ import java.awt.geom.RoundRectangle2D;
 import java.awt.image.BufferedImage;
 import javax.swing.ImageIcon;
 
-/** Logo de RQ dibujado con Java2D (un bus sobre fondo azul con las letras RQ). */
-public final class IconoRQ {
-    private IconoRQ() {
+/** Logo de la aplicación dibujado con Java2D (un bus sobre fondo azul). */
+public final class IconoApp {
+    private IconoApp() {
     }
 
     public static BufferedImage crear(int s) {
@@ -58,11 +58,6 @@ public final class IconoRQ {
         g.setColor(new Color(255, 255, 255, 120));
         g.drawLine((int) (s * 0.13f), (int) (s * 0.80f), (int) (s * 0.87f), (int) (s * 0.80f));
 
-        g.setFont(new Font("SansSerif", Font.BOLD, Math.max(8, (int) (s * 0.19f))));
-        FontMetrics fm = g.getFontMetrics();
-        String texto = "RQ";
-        g.setColor(Tema.AMBAR);
-        g.drawString(texto, (s - fm.stringWidth(texto)) / 2f, s * 0.80f + fm.getAscent() * 0.78f);
         g.dispose();
         return img;
     }

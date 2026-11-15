@@ -319,8 +319,8 @@ public class ControladorDespacho {
         try {
             Novedades dao = new Novedades("novedades.dat");
             Novedad n = dao.obten(idNovedad);
-            if (n == null || !"NO_PUEDE_VIAJAR".equals(n.getTipo()) || n.getIdViaje() == null || n.getIdViaje().isEmpty()) {
-                return new ResultadoOperacion(false, "Este reporte no es una solicitud de cancelación de viaje");
+            if (!esReporteDeViaje(n)) {
+                return new ResultadoOperacion(false, "Este reporte no es una solicitud sobre un viaje");
             }
             if (Novedad.RESUELTA.equals(n.getEstado())) {
                 return new ResultadoOperacion(false, "Esta solicitud ya fue resuelta");
@@ -351,6 +351,91 @@ public class ControladorDespacho {
             return new ResultadoOperacion(true, aprobar ? "Viaje cancelado. " + texto : "Solicitud denegada.", n);
         } catch (PersistenciaException | FachadaException e) {
             return new ResultadoOperacion(false, e.getMessage());
+        }
+    }
+
+    /** Reportes del conductor que afectan a un viaje concreto: "no puedo viajar" o "falla mecánica" con el viaje elegido. */
+    public static boolean esReporteDeViaje(Novedad n) {
+        return n != null && ("NO_PUEDE_VIAJAR".equals(n.getTipo()) || "FALLA_MECANICA".equals(n.getTipo()))
+                && n.getIdViaje() != null && !n.getIdViaje().isEmpty();
+    }
+
+    /**
+     * El administrador acepta el reporte y reemplaza el bus del viaje por otro de la misma empresa que esté activo, libre a esa hora,
+     * sin otro conductor y con la misma capacidad (los asientos ya vendidos se conservan). Si el reporte es una falla mecánica,
+     * el bus averiado queda INACTIVO. Si no hay reemplazo se devuelve error y el admin puede cancelar el viaje (con reembolso).
+     */
+    public synchronized ResultadoOperacion reasignarBus(Usuario actor, String idNovedad) {
+        if (!Permisos.puedeEditar(actor, Permisos.Modulo.VIAJES) && !Permisos.puedeEditar(actor, Permisos.Modulo.NOVEDADES)) {
+            return new ResultadoOperacion(false, "Tu cargo no puede reasignar buses");
+        }
+        try {
+            Novedades dao = new Novedades("novedades.dat");
+            Novedad n = dao.obten(idNovedad);
+            if (!esReporteDeViaje(n)) {
+                return new ResultadoOperacion(false, "Este reporte no es sobre un viaje");
+            }
+            if (Novedad.RESUELTA.equals(n.getEstado())) {
+                return new ResultadoOperacion(false, "Este reporte ya fue resuelto");
+            }
+            Viaje v = fachada.obten(new Viaje(n.getIdViaje()));
+            LocalDateTime salida = v == null ? null : ControladorCompras.salidaDe(v);
+            if (v == null || salida == null || !salida.isAfter(LocalDateTime.now())
+                    || !(ControladorSimulacion.PROGRAMADO.equalsIgnoreCase(v.getEstado()) || ControladorSimulacion.POR_ACEPTAR.equalsIgnoreCase(v.getEstado()))) {
+                return new ResultadoOperacion(false, "El viaje ya salió, terminó o fue cancelado: no se puede cambiar su bus");
+            }
+            Bus viejo = fachada.obten(new Bus(v.getBus().getIdBus()));
+            String idEmpresa = v.getEmpresa() == null ? "" : v.getEmpresa().getIdEmpresa();
+            ControladorAsignaciones asignaciones = new ControladorAsignaciones();
+            java.util.Set<String> ocupados = new java.util.HashSet<>();
+            for (ControladorAsignaciones.Asignacion a : asignaciones.listar()) {
+                ocupados.add(a.getIdBus());
+            }
+            ControladorViajes viajes = new ControladorViajes();
+            Bus nuevo = null;
+            for (Bus b : fachada.consultaBuses()) {
+                boolean sirve = b.getEmpresa() != null && b.getEmpresa().getIdEmpresa().equals(idEmpresa) && "ACTIVO".equalsIgnoreCase(b.getEstado())
+                        && !b.getIdBus().equals(viejo.getIdBus()) && b.getCapacidad() == viejo.getCapacidad() && !ocupados.contains(b.getIdBus())
+                        && viajes.verificarDisponibilidadBus(b.getIdBus(), v.getFechaSalida(), v.getFechaLlegada(), v.getHoraSalida(), v.getHoraLlegada(), v.getIdViaje()).isExito();
+                if (sirve) {
+                    nuevo = b;
+                    break;
+                }
+            }
+            if (nuevo == null) {
+                return new ResultadoOperacion(false, "No hay otro bus activo, libre a esa hora y con " + viejo.getCapacidad()
+                        + " asientos. Si no se puede reemplazar, cancela el viaje (se reembolsa a los pasajeros).");
+            }
+            v.setBus(nuevo);
+            fachada.actualiza(v);
+            String idConductor = n.getIdConductor();
+            asignaciones.cambiarBus(idConductor, nuevo.getIdBus());
+            int otros = 0;
+            for (Viaje o : fachada.consultaViajes()) {
+                LocalDateTime s = ControladorCompras.salidaDe(o);
+                boolean futuro = s != null && s.isAfter(LocalDateTime.now()) && !o.getIdViaje().equals(v.getIdViaje())
+                        && (ControladorSimulacion.PROGRAMADO.equalsIgnoreCase(o.getEstado()) || ControladorSimulacion.POR_ACEPTAR.equalsIgnoreCase(o.getEstado()));
+                if (futuro && ControladorNovedades.esConductorDelViaje(o, idConductor) && o.getBus() != null && o.getBus().getIdBus().equals(viejo.getIdBus())
+                        && viajes.verificarDisponibilidadBus(nuevo.getIdBus(), o.getFechaSalida(), o.getFechaLlegada(), o.getHoraSalida(), o.getHoraLlegada(), o.getIdViaje()).isExito()) {
+                    o.setBus(nuevo);
+                    fachada.actualiza(o);
+                    otros++;
+                }
+            }
+            if ("FALLA_MECANICA".equals(n.getTipo())) {
+                viejo.setEstado("INACTIVO");
+                fachada.actualiza(viejo);
+            }
+            String texto = "Reporte aceptado. Tu viaje " + v.getIdViaje() + " sale ahora con el bus " + nuevo.getPlaca()
+                    + (otros > 0 ? " (también en tus " + otros + " viaje(s) siguientes)" : "") + ".";
+            n.setRespuesta(texto.length() > 200 ? texto.substring(0, 197) + "..." : texto);
+            n.setEstado(Novedad.RESUELTA);
+            n.setIdRevisor(actor.getIdUsuario());
+            dao.actualiza(n);
+            avisos.enviar(idConductor, "Bus reasignado", texto, v.getIdViaje());
+            return new ResultadoOperacion(true, texto, n);
+        } catch (PersistenciaException | FachadaException | java.io.IOException e) {
+            return new ResultadoOperacion(false, "No se pudo reasignar el bus: " + e.getMessage());
         }
     }
 

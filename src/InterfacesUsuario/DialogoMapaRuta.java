@@ -20,7 +20,7 @@ import objetosNegocio.Ruta;
 public class DialogoMapaRuta extends JDialog {
     public DialogoMapaRuta(Window padre, Ruta ruta, String detalleViaje) {
         super(padre, "Ruta del viaje", Dialog.ModalityType.APPLICATION_MODAL);
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado(ruta.getOrigen() + "  →  " + ruta.getDestino(), "Viaje directo · el bus no hace paradas"), BorderLayout.NORTH);
         PanelMapaRuta mapa = new PanelMapaRuta();

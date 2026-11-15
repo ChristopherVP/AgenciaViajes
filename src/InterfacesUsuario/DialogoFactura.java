@@ -32,7 +32,7 @@ public class DialogoFactura extends JDialog {
     public DialogoFactura(Window padre, Comprobante factura) {
         super(padre, "Factura " + factura.getNumero(), Dialog.ModalityType.APPLICATION_MODAL);
         this.factura = factura;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Factura N.º " + factura.getNumero(), factura.getTipoEtiqueta() + " · " + factura.getFecha().format(FORMATO)), BorderLayout.NORTH);
 
@@ -58,9 +58,9 @@ public class DialogoFactura extends JDialog {
         total.setFont(Tema.fuente(Font.BOLD, 22f));
         total.setForeground(Color.BLACK);
 
-        JButton pdf = Tema.boton("Guardar en PDF", false);
+        JButton pdf = Tema.boton("Descargar PDF", true);
         pdf.addActionListener(e -> guardarPdf());
-        JButton cerrar = Tema.boton("Cerrar", true);
+        JButton cerrar = Tema.boton("Cerrar", false);
         cerrar.addActionListener(e -> dispose());
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
         botones.setOpaque(false);
@@ -87,32 +87,7 @@ public class DialogoFactura extends JDialog {
     }
 
     private void guardarPdf() {
-        JFileChooser selector = new JFileChooser();
-        selector.setDialogTitle("Guardar factura");
-        selector.setFileFilter(new FileNameExtensionFilter("PDF (*.pdf)", "pdf"));
-        selector.setSelectedFile(new File("Factura_" + factura.getNumero() + ".pdf"));
-        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
-            return;
-        }
-        File destino = selector.getSelectedFile();
-        if (!destino.getName().toLowerCase().endsWith(".pdf")) {
-            destino = new File(destino.getParentFile(), destino.getName() + ".pdf");
-        }
-        try {
-            InformePdf.guardarFactura(destino, factura.getEmisor(), factura.getNumero(), factura.getTipoEtiqueta(), factura.getFecha().format(FORMATO),
-                    factura.getNombreTitular(), factura.getCedulaTitular(), factura.getConcepto(), factura.getDetalle(), String.format("$%.2f", factura.getTotal()));
-        } catch (IOException e) {
-            Tema.error(this, "No se pudo guardar la factura: " + e.getMessage());
-            return;
-        }
-        Object[] opciones = {"Abrir", "Cerrar"};
-        if (JOptionPane.showOptionDialog(this, "Factura guardada en:\n" + destino.getAbsolutePath(), "Factura guardada", JOptionPane.DEFAULT_OPTION,
-                JOptionPane.INFORMATION_MESSAGE, null, opciones, opciones[1]) == 0) {
-            try {
-                Desktop.getDesktop().open(destino);
-            } catch (Exception e) {
-                Tema.info(this, "Ábrela desde la carpeta indicada.");
-            }
-        }
+        Descargas.guardarPdf(this, "Descargar factura", control.ComprobantesPdf.nombreSugerido("Factura", factura.getNumero()),
+                destino -> new control.ComprobantesPdf().factura(destino, factura));
     }
 }

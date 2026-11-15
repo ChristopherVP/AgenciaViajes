@@ -33,7 +33,7 @@ public class PantallaRecuperarClave extends JDialog {
 
     public PantallaRecuperarClave(Window padre) {
         super(padre, "Recuperar contraseña", Dialog.ModalityType.APPLICATION_MODAL);
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Recuperar contraseña", "No necesitas recordar tu usuario"), BorderLayout.NORTH);
         contenedor.setBackground(Tema.FONDO);

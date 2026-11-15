@@ -45,18 +45,15 @@ public class PanelNovedadesAdmin extends JPanel {
         arriba.setOpaque(false);
         arriba.add(Tema.etiqueta("Mostrar"));
         arriba.add(cmbFiltro);
-        javax.swing.JButton responder = Tema.boton("Responder", true);
+        javax.swing.JButton responder = Tema.boton("Atender reporte", true);
+        javax.swing.JButton pdf = Tema.boton("Descargar PDF", false);
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         responder.addActionListener(e -> responder());
+        pdf.addActionListener(e -> descargarPdf());
         actualizar.addActionListener(e -> recargar());
         cmbFiltro.addActionListener(e -> recargar());
-        javax.swing.JButton aprobar = Tema.boton("Aprobar cancelación de viaje", false);
-        aprobar.addActionListener(e -> decidirCancelacion(true));
-        javax.swing.JButton denegar = Tema.boton("Denegar cancelación", false);
-        denegar.addActionListener(e -> decidirCancelacion(false));
         arriba.add(responder);
-        arriba.add(aprobar);
-        arriba.add(denegar);
+        arriba.add(pdf);
         arriba.add(actualizar);
         add(arriba, BorderLayout.NORTH);
 
@@ -126,57 +123,22 @@ public class PanelNovedadesAdmin extends JPanel {
     }
 
     private void responder() {
-        int fila = tabla.getSelectedRow();
-        if (fila < 0) {
+        Novedad n = novedadDeFila(tabla.getSelectedRow());
+        if (n == null) {
             Tema.error(this, "Selecciona un reporte de la lista.");
             return;
         }
-        Novedad n = novedadDeFila(fila);
-        if (n == null) {
-            return;
-        }
-        String respuesta = JOptionPane.showInputDialog(this, "Respuesta para quien envió el reporte (5 a 200 caracteres):", "Responder reporte", JOptionPane.QUESTION_MESSAGE);
-        if (respuesta == null) {
-            return;
-        }
-        int resuelto = JOptionPane.showConfirmDialog(this, "¿Marcar el reporte como RESUELTO?\n(No = queda EN REVISIÓN)", "Estado del reporte", JOptionPane.YES_NO_CANCEL_OPTION);
-        if (resuelto == JOptionPane.CANCEL_OPTION || resuelto == JOptionPane.CLOSED_OPTION) {
-            return;
-        }
-        ResultadoOperacion r = controlador.responder(actor, n.getIdNovedad(), respuesta, resuelto == JOptionPane.YES_OPTION ? Novedad.RESUELTA : Novedad.EN_REVISION);
-        if (!r.isExito()) {
-            Tema.error(this, r.getMensaje());
-        }
-        recargar();
+        String remitente = controlador.nombresDeConductores().getOrDefault(n.getIdConductor(), n.getIdConductor());
+        new DialogoResponderNovedad(javax.swing.SwingUtilities.getWindowAncestor(this), actor, n, remitente, this::recargar).setVisible(true);
     }
 
-    /** Solicitudes "No puedo realizar el viaje": aprobar cancela el viaje, reembolsa a los pasajeros y saca el pago de la lista. */
-    private void decidirCancelacion(boolean aprobar) {
+    private void descargarPdf() {
         Novedad n = novedadDeFila(tabla.getSelectedRow());
         if (n == null) {
-            Tema.error(this, "Selecciona la solicitud del conductor.");
+            Tema.error(this, "Selecciona un reporte de la lista.");
             return;
         }
-        if (!"NO_PUEDE_VIAJAR".equals(n.getTipo()) || n.getIdViaje() == null || n.getIdViaje().isEmpty()) {
-            Tema.error(this, "Esta novedad no es una solicitud de cancelar un viaje.");
-            return;
-        }
-        control.ControladorDespacho despacho = new control.ControladorDespacho();
-        ResultadoOperacion r;
-        if (aprobar) {
-            if (JOptionPane.showConfirmDialog(this, "Se cancelará el viaje " + n.getIdViaje() + ", se devolverá el dinero a los pasajeros y\nsaldrá de la lista de pagos al conductor. ¿Continuar?",
-                    "Aprobar cancelación", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
-                return;
-            }
-            r = despacho.aprobarCancelacion(actor, n.getIdNovedad());
-        } else {
-            String motivo = JOptionPane.showInputDialog(this, "Motivo para denegar (el conductor debe realizar el viaje):", "Denegar cancelación", JOptionPane.QUESTION_MESSAGE);
-            if (motivo == null) {
-                return;
-            }
-            r = despacho.denegarCancelacion(actor, n.getIdNovedad(), motivo);
-        }
-        if (r.isExito()) Tema.info(this, r.getMensaje()); else Tema.error(this, r.getMensaje());
-        recargar();
+        Descargas.guardarPdf(this, "Descargar reporte", control.ComprobantesPdf.nombreSugerido("Reporte", n.getIdNovedad()),
+                destino -> new control.ComprobantesPdf().novedad(destino, n));
     }
 }

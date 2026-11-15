@@ -23,7 +23,7 @@ import javax.swing.Timer;
  * Pantalla de inicio animada: muestra el logo, explica de qué trata el sistema con frases que rotan y avanza
  * la barra de progreso según el trabajo real de preparación de los datos.
  */
-public class SplashRQ extends JWindow {
+public class SplashScreen extends JWindow {
     private static final int ANCHO = 760;
     private static final int ALTO = 420;
     private static final long DURACION_MINIMA_MS = 1500;
@@ -38,7 +38,7 @@ public class SplashRQ extends JWindow {
     };
 
     private final Runnable alTerminar;
-    private final BufferedImage logo = IconoRQ.crear(170);
+    private final BufferedImage logo = IconoApp.crear(170);
     private final long inicio = System.currentTimeMillis();
     private long inicioFrase = inicio;
     private int frase;
@@ -56,7 +56,7 @@ public class SplashRQ extends JWindow {
         }
     };
 
-    public SplashRQ(Runnable alTerminar) {
+    public SplashScreen(Runnable alTerminar) {
         this.alTerminar = alTerminar;
         // pantalla completa desde el primer momento: la tarjeta del logo se dibuja centrada y escalada
         java.awt.Dimension pantalla = java.awt.Toolkit.getDefaultToolkit().getScreenSize();

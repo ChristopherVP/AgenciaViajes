@@ -32,6 +32,8 @@ public class DialogoComprarPasaje extends JDialog {
     private final Oferta oferta;
     private final Runnable alCambiar;
     private List<Integer> asientos = new ArrayList<>();
+    private javax.swing.Timer vigilante;
+    private JButton btnElegirRef;
 
     private final JLabel lblAsientos = Tema.titulo("Ninguno", 15f);
     private final JLabel lblTotal = Tema.titulo("—", 22f);
@@ -46,7 +48,7 @@ public class DialogoComprarPasaje extends JDialog {
         this.usuario = usuario;
         this.oferta = oferta;
         this.alCambiar = alCambiar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado(oferta.getOrigen() + " → " + oferta.getDestino(), oferta.getEmpresa()), BorderLayout.NORTH);
 
@@ -58,10 +60,11 @@ public class DialogoComprarPasaje extends JDialog {
         Tema.fila(info, 1, "Llegada estimada", Tema.etiqueta(llegada));
         Tema.fila(info, 2, "Precio base por asiento", Tema.etiqueta(Tema.dinero(oferta.getPrecioUnitario())));
         Tema.fila(info, 3, "Asientos libres", Tema.etiqueta(String.valueOf(oferta.getViaje().getAsientosDisponibles())));
-        JLabel nota = Tema.nota(440, "<html>Las tarifas preferenciales (niños, adolescentes, tercera edad y discapacidad) se aplican automáticamente en el total.</html>");
+        JLabel nota = Tema.nota(600, "<html>Las tarifas preferenciales (niños, adolescentes, tercera edad y discapacidad) se aplican automáticamente en el total.</html>");
         nota.setForeground(Tema.TEXTO_SUAVE);
 
         JButton btnElegir = Tema.boton("Elegir asientos...", false);
+        btnElegirRef = btnElegir;
         btnElegir.addActionListener(e -> elegirAsientos());
         JPanel seleccion = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
         seleccion.setOpaque(false);
@@ -87,7 +90,7 @@ public class DialogoComprarPasaje extends JDialog {
 
         JPanel centro = new JPanel(new BorderLayout(0, 10));
         centro.setBackground(Tema.FONDO);
-        centro.setBorder(BorderFactory.createEmptyBorder(16, 28, 16, 28));
+        centro.setBorder(BorderFactory.createEmptyBorder(10, 24, 10, 24));
         JPanel medio = new JPanel(new BorderLayout(0, 8));
         medio.setOpaque(false);
         JPanel superior = new JPanel(new BorderLayout(0, 4));
@@ -100,7 +103,7 @@ public class DialogoComprarPasaje extends JDialog {
         centro.add(medio, BorderLayout.CENTER);
         JPanel sur = new JPanel(new BorderLayout(0, 6));
         sur.setOpaque(false);
-        JLabel advertencia = Tema.nota(500, "<html><b>Importante:</b> los pasajes comprados <b>no se pueden cancelar ni se reembolsan</b>. "
+        JLabel advertencia = Tema.nota(600, "<html><b>Importante:</b> los pasajes comprados <b>no se pueden cancelar ni se reembolsan</b>. "
                 + "Revisa bien la ruta, el horario y tus asientos antes de pagar.</html>");
         advertencia.setForeground(new java.awt.Color(0x9A1C1C));
         chkSinDevolucion.setOpaque(false);
@@ -116,9 +119,21 @@ public class DialogoComprarPasaje extends JDialog {
         centro.add(sur, BorderLayout.SOUTH);
         add(centro, BorderLayout.CENTER);
         actualizar();
-        setPreferredSize(new Dimension(660, 680));
-        pack();
+        // Tamaño fijo que cabe en cualquier pantalla: nada queda cortado y el contenido no se estira.
+        Dimension pantalla = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
+        setSize(new Dimension(Math.min(700, pantalla.width - 40), Math.min(640, pantalla.height - 80)));
+        setMinimumSize(getSize());
+        setResizable(false);
         setLocationRelativeTo(padre);
+        // La venta se cierra sola a la hora de salida aunque el diálogo siga abierto.
+        vigilante = new javax.swing.Timer(1000, e -> actualizar());
+        vigilante.start();
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosed(java.awt.event.WindowEvent e) {
+                vigilante.stop();
+            }
+        });
     }
 
     private void elegirAsientos() {
@@ -143,6 +158,13 @@ public class DialogoComprarPasaje extends JDialog {
         lblAsientos.setText(asientos.isEmpty() ? "Ninguno" : asientos.toString().replace("[", "").replace("]", ""));
         btnPagar.setEnabled(false);
         btnRecargar.setVisible(false);
+        String cerrada = compras.motivoNoComprable(oferta.getViaje());
+        if (cerrada != null) {
+            lblTotal.setText("—");
+            btnElegirRef.setEnabled(false);
+            Tema.mostrarMensaje(lblAviso, "Venta cerrada: " + cerrada, false);
+            return;
+        }
         if (asientos.isEmpty()) {
             lblTotal.setText("—");
             Tema.mostrarMensaje(lblAviso, "Elige al menos un asiento para continuar.", false);

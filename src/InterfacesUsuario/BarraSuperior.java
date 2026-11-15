@@ -20,6 +20,52 @@ public final class BarraSuperior {
     private BarraSuperior() {
     }
 
+    /** Foto de perfil recortada en círculo; si la persona no subió una, un círculo con sus iniciales. */
+    public static javax.swing.ImageIcon avatar(Usuario usuario, int tamano) {
+        java.awt.image.BufferedImage foto = usuario.getIdPerfil() == null || usuario.getIdPerfil().isEmpty() ? null
+                : new control.ControladorFotos().cargar(usuario.getIdPerfil());
+        java.awt.image.BufferedImage salida = new java.awt.image.BufferedImage(tamano, tamano, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.awt.Graphics2D g = salida.createGraphics();
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        g.setClip(new java.awt.geom.Ellipse2D.Float(0, 0, tamano, tamano));
+        if (foto != null) {
+            g.drawImage(foto, 0, 0, tamano, tamano, null);
+        } else {
+            g.setColor(Tema.AZUL);
+            g.fillRect(0, 0, tamano, tamano);
+            String nombre = usuario.getNombre() == null ? "" : usuario.getNombre().trim();
+            String iniciales = nombre.isEmpty() ? "?" : String.valueOf(Character.toUpperCase(nombre.charAt(0)));
+            int sp = nombre.lastIndexOf(' ');
+            if (sp > 0 && sp + 1 < nombre.length()) {
+                iniciales += Character.toUpperCase(nombre.charAt(sp + 1));
+            }
+            g.setColor(Color.WHITE);
+            g.setFont(Tema.fuente(Font.BOLD, tamano * 0.4f));
+            java.awt.FontMetrics fm = g.getFontMetrics();
+            g.drawString(iniciales, (tamano - fm.stringWidth(iniciales)) / 2f, (tamano + fm.getAscent() - fm.getDescent()) / 2f);
+        }
+        g.dispose();
+        return new javax.swing.ImageIcon(salida);
+    }
+
+    /** Vuelve a dibujar la foto de la barra superior de la ventana (después de subirla o quitarla en Mi perfil). */
+    public static void refrescarAvatar(java.awt.Container raiz) {
+        if (raiz == null) {
+            return;
+        }
+        for (java.awt.Component c : raiz.getComponents()) {
+            if (c instanceof JLabel l && l.getClientProperty("avatarUsuario") instanceof Usuario u) {
+                l.setIcon(avatar(u, 40));
+            } else if (c instanceof java.awt.Container hijo) {
+                refrescarAvatar(hijo);
+            }
+        }
+        if (raiz instanceof javax.swing.JFrame f) {
+            refrescarAvatar(f.getContentPane());
+        }
+    }
+
     public static JPanel crear(Window ventana, Usuario usuario, JComponent centro, Runnable alActualizarPerfil, JButton... extras) {
         JPanel barra = new JPanel(new BorderLayout(12, 0));
         barra.setBackground(Color.WHITE);
@@ -29,7 +75,13 @@ public final class BarraSuperior {
         JLabel saludo = new JLabel("Hola, " + usuario.getNombre() + "  ·  " + cargo);
         saludo.setFont(Tema.fuente(Font.BOLD, 15f));
         saludo.setForeground(Color.BLACK);
-        barra.add(saludo, BorderLayout.WEST);
+        JPanel izquierda = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        izquierda.setOpaque(false);
+        JLabel avatar = new JLabel(avatar(usuario, 40));
+        avatar.putClientProperty("avatarUsuario", usuario);
+        izquierda.add(avatar);
+        izquierda.add(saludo);
+        barra.add(izquierda, BorderLayout.WEST);
         if (centro != null) {
             JPanel c = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 6));
             c.setOpaque(false);

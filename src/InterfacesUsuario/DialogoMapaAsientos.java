@@ -212,7 +212,7 @@ public class DialogoMapaAsientos extends JDialog {
             btn.setBackground(new Color(52, 152, 219));
             btn.setForeground(Color.BLACK);
         } else {
-            this.asientosSeleccionados.remove(numeroAsiento);
+            this.asientosSeleccionados.remove(Integer.valueOf(numeroAsiento));
             btn.setBackground(new Color(46, 204, 113));
             btn.setForeground(Color.BLACK);
         }

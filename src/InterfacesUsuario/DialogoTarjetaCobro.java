@@ -37,7 +37,7 @@ public class DialogoTarjetaCobro extends JDialog {
         super(padre, "Tarjeta de cobro", Dialog.ModalityType.APPLICATION_MODAL);
         this.conductor = conductor;
         this.alGuardar = alGuardar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Tarjeta de débito para tus pagos", conductor.getNombre()), BorderLayout.NORTH);
         cmbBanco.addItem("Selecciona tu banco...");

@@ -44,7 +44,7 @@ public class DialogoAsignacionConductor extends JDialog {
         this.actor = actor;
         this.conductor = conductor;
         this.alGuardar = alGuardar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Asignar bus y ruta", conductor.getNombre()), BorderLayout.NORTH);
 

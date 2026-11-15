@@ -67,6 +67,7 @@ public final class InicializadorSistema {
         } catch (PersistenciaException e) {
             resumen.advertencias.add("Datos iniciales: " + e.getMessage());
         }
+        new ControladorReservas().migrarPendientesDePago();
         notificar(progreso, 85, "Cargando pasajeros, facturas y pagos de ejemplo...");
         try {
             DatosDemostracion.sembrarSiHaceFalta();

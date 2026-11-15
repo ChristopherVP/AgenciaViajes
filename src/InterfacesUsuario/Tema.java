@@ -90,11 +90,11 @@ public final class Tema {
 
     /**
      * Con el aspecto de Windows los botones con color propio se ven claros y su letra blanca no se lee. Todos los botones
-     * antiguos pasan a letra negra; los botones del tema nuevo (BotonRQ) se dejan como están.
+     * antiguos pasan a letra negra; los botones del tema nuevo (BotonApp) se dejan como están.
      */
     public static void legibilizar(java.awt.Component c) {
         if (c instanceof javax.swing.AbstractButton b && !(c instanceof javax.swing.JCheckBox) && !(c instanceof javax.swing.JRadioButton)
-                && !"BotonRQ".equals(c.getClass().getSimpleName()) && !(c instanceof javax.swing.JMenuItem)) {
+                && !"BotonApp".equals(c.getClass().getSimpleName()) && !(c instanceof javax.swing.JMenuItem)) {
             java.awt.Color fg = b.getForeground();
             if (fg != null && (fg.getRed() + fg.getGreen() + fg.getBlue()) / 3 > 150) {
                 b.setForeground(Color.BLACK);
@@ -134,11 +134,11 @@ public final class Tema {
     }
 
     /** Botón redondeado que se pinta solo (los colores se ven igual en cualquier sistema). */
-    public static class BotonRQ extends JButton {
+    public static class BotonApp extends JButton {
         private final boolean primario;
         private boolean encima;
 
-        BotonRQ(String texto, boolean primario) {
+        BotonApp(String texto, boolean primario) {
             super(texto);
             this.primario = primario;
             setContentAreaFilled(false);
@@ -188,7 +188,7 @@ public final class Tema {
     }
 
     public static JButton boton(String texto, boolean primario) {
-        return new BotonRQ(texto, primario);
+        return new BotonApp(texto, primario);
     }
 
     public static JLabel etiqueta(String texto) {
@@ -284,7 +284,7 @@ public final class Tema {
             }
         };
         p.setBorder(BorderFactory.createEmptyBorder(12, 18, 12, 18));
-        p.add(new JLabel(IconoRQ.icono(48)), BorderLayout.WEST);
+        p.add(new JLabel(IconoApp.icono(48)), BorderLayout.WEST);
         JPanel textos = new JPanel(new GridBagLayout());
         textos.setOpaque(false);
         JLabel t = new JLabel(titulo);

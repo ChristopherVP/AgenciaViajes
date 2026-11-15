@@ -91,6 +91,23 @@ public class ControladorNovedades {
                 }
                 viajeFinal = v.getIdViaje();
             }
+            boolean sobreViaje = "NO_PUEDE_VIAJAR".equals(tipo) || "FALLA_MECANICA".equals(tipo);
+            if (esConductor && "NO_PUEDE_VIAJAR".equals(tipo) && viajeFinal.isEmpty()) {
+                return new ResultadoOperacion(false, "Elige el viaje que no podrás realizar");
+            }
+            if (esConductor && sobreViaje && !viajeFinal.isEmpty()) {
+                Viaje v = viajes.obten(new Viaje(viajeFinal));
+                java.time.LocalDateTime salida = v == null ? null : ControladorCompras.salidaDe(v);
+                if (salida == null || !salida.isAfter(LocalDateTime.now())) {
+                    return new ResultadoOperacion(false, "El bus de ese viaje ya salió: ya no se puede reportar un problema para cancelarlo o cambiar el bus");
+                }
+                final String idV = viajeFinal;
+                boolean yaAvisado = novedades.lista().stream().anyMatch(n -> actor.getIdPerfil().equals(n.getIdConductor()) && idV.equals(n.getIdViaje())
+                        && ("NO_PUEDE_VIAJAR".equals(n.getTipo()) || "FALLA_MECANICA".equals(n.getTipo())));
+                if (yaAvisado) {
+                    return new ResultadoOperacion(false, "Ya avisaste un problema sobre el viaje " + viajeFinal + ". Solo se puede avisar una vez: espera la respuesta del administrador.");
+                }
+            }
             long abiertas = novedades.lista().stream()
                     .filter(n -> actor.getIdPerfil().equals(n.getIdConductor()) && !Novedad.RESUELTA.equals(n.getEstado())).count();
             if (abiertas >= MAX_ABIERTAS) {
@@ -109,6 +126,9 @@ public class ControladorNovedades {
             n.setRespuesta("");
             n.setIdRevisor("");
             novedades.agrega(n);
+            new ControladorNotificaciones().enviar(ControladorNotificaciones.ADMIN, "Nuevo reporte: " + TIPOS.get(tipo),
+                    (esConductor ? "Conductor " : "Pasajero ") + actor.getNombre() + ": " + a + (viajeFinal.isEmpty() ? "" : " (viaje " + viajeFinal + ")")
+                            + ". Revisa la pestaña Novedades.", n.getIdNovedad());
             return new ResultadoOperacion(true, "Reporte enviado al administrador", n);
         } catch (PersistenciaException e) {
             return new ResultadoOperacion(false, e.getMessage());

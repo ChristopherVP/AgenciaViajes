@@ -32,7 +32,7 @@ public class PantallaInicioSesion extends JFrame {
 
     public PantallaInicioSesion() {
         setTitle(objetosServicio.Marca.NOMBRE + " - Iniciar sesión");
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         // pantalla completa: marca a la izquierda y formulario centrado a la derecha
         JPanel raiz = new JPanel(new java.awt.GridLayout(1, 2));
@@ -65,7 +65,7 @@ public class PantallaInicioSesion extends JFrame {
         g.gridx = 0;
         g.gridy = 0;
         g.insets = new Insets(0, 0, 14, 0);
-        p.add(new JLabel(IconoRQ.icono(150)), g);
+        p.add(new JLabel(IconoApp.icono(150)), g);
         JLabel t = new JLabel(objetosServicio.Marca.NOMBRE);
         t.setFont(Tema.fuente(Font.BOLD, 40f));
         t.setForeground(Color.WHITE);

@@ -46,7 +46,7 @@ public class DialogoRevisionConductor extends JDialog {
         this.actor = actor;
         this.conductor = conductor;
         this.alTerminar = alTerminar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Solicitud de conductor", conductor.getNombre() + " · cédula " + conductor.getCedula()), BorderLayout.NORTH);
 

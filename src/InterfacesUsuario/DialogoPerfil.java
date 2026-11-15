@@ -92,7 +92,7 @@ public class DialogoPerfil extends JDialog {
         this.usuario = usuario;
         this.alActualizar = alActualizar;
         cmbPregunta = new JComboBox<>(usuario.getRol() == Rol.ADMINISTRADOR ? Tema.PREGUNTAS_ADMIN : Tema.PREGUNTAS);
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado(usuario.getNombre(), usuario.getTipo() + (usuario.getCargo().isEmpty() ? "" : " · " + usuario.getCargo()) + "  ·  usuario: " + usuario.getLogin()), BorderLayout.NORTH);
 
@@ -157,6 +157,8 @@ public class DialogoPerfil extends JDialog {
             Tema.mostrarMensaje(msjFoto, r.getMensaje(), r.isExito());
             mostrarFoto();
             alActualizar.run();
+            BarraSuperior.refrescarAvatar(getOwner());
+            actualizarResumen();
         });
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
         botones.setOpaque(false);
@@ -195,6 +197,8 @@ public class DialogoPerfil extends JDialog {
         Tema.mostrarMensaje(msjFoto, r.getMensaje(), r.isExito());
         mostrarFoto();
         alActualizar.run();
+        BarraSuperior.refrescarAvatar(getOwner());
+        actualizarResumen();
     }
 
     private void agregarBoton(JPanel panel, String texto, String tarjeta) {
@@ -257,7 +261,11 @@ public class DialogoPerfil extends JDialog {
         JLabel ayuda = Tema.nota(560, "<html>Usa los botones de la izquierda para modificar tus datos, cambiar tu contraseña"
                 + (usuario.getRol() == Rol.PASAJERO ? " o escribirle una novedad o queja al administrador." : ".") + "</html>");
         ayuda.setForeground(Tema.TEXTO_SUAVE);
-        resumen.add(Tema.titulo("Mi cuenta", 18f), BorderLayout.NORTH);
+        JPanel cabeza = new JPanel(new BorderLayout(14, 0));
+        cabeza.setOpaque(false);
+        cabeza.add(new JLabel(BarraSuperior.avatar(usuario, 84)), BorderLayout.WEST);
+        cabeza.add(Tema.titulo("Mi cuenta", 18f), BorderLayout.CENTER);
+        resumen.add(cabeza, BorderLayout.NORTH);
         JPanel medio = new JPanel(new BorderLayout(0, 14));
         medio.setOpaque(false);
         medio.add(f, BorderLayout.NORTH);

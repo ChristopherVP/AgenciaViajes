@@ -79,4 +79,3 @@ public class Comprobante {
         return c;
     }
 }
-

@@ -56,7 +56,7 @@ public class DialogoCambioClave extends JDialog {
         cmbPregunta.setEditable(true);
         cmbPregunta.setSelectedItem(null);
         cmbPregunta.setFont(Tema.fuente(Font.PLAIN, 13f));
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
         add(Tema.encabezado("Configura tu cuenta", "Hola " + usuario.getNombre() + ": tu contraseña actual es temporal"), BorderLayout.NORTH);

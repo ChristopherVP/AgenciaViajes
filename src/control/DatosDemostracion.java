@@ -54,48 +54,74 @@ public final class DatosDemostracion {
         if (MARCA.exists()) {
             return 0;
         }
-        int creados = 0;
-        try {
-            quitarSufijoRQ();
-            List<Pasajero> pasajeros = crearPasajeros();
+        int[] creados = {0};
+        List<String> problemas = new ArrayList<>();
+        List<Pasajero> pasajeros = new ArrayList<>();
+        List<Empresa> empresas = new ArrayList<>();
+        List<Viaje> pasados = new ArrayList<>();
+        paso("base", problemas, () -> {
+            quitarSufijoAntiguo();
             registrarTarjetasDeCobro();
-            List<Empresa> empresas = new Empresas("empresas.dat").lista();
-            if (empresas.isEmpty() || pasajeros.isEmpty()) {
-                return 0;
-            }
-            ControladorViajes viajes = new ControladorViajes();
-            List<Viaje> pasados = new ArrayList<>();
-            for (Empresa e : empresas) {
-                pasados.addAll(crearViajesPasados(viajes, e));
-            }
-            int turno = 0;
-            for (Viaje v : pasados) {
-                turno = venderPasajes(v, pasajeros, turno, 4 + AZAR.nextInt(5));
-                creados++;
-            }
-            // el viaje sin pasajeros de la lista no existe: todos los pasados tienen ventas. Ahora el reloj los termina.
-            new ControladorSimulacion().avanzar();
-            pagarAlgunos(pasados);
-            cancelarUnoConReembolso(viajes, empresas.get(0), pasajeros);
-            creados += preparaViajeEnCurso(viajes, empresas, pasajeros);
-            ventasFuturas(pasajeros);
-            novedades(pasajeros);
-            recargasExtra(pasajeros);
-            new ControladorSimulacion().avanzar();
+            pasajeros.addAll(crearPasajeros());
+            empresas.addAll(new Empresas("empresas.dat").lista());
+        });
+        if (pasajeros.isEmpty() || empresas.isEmpty()) {
+            return 0;
+        }
+        ControladorViajes viajes = new ControladorViajes();
+        for (Empresa e : empresas) {
+            paso("viajes pasados " + e.getIdEmpresa(), problemas, () -> pasados.addAll(crearViajesPasados(viajes, e)));
+        }
+        int[] turno = {0};
+        for (Viaje v : pasados) {
+            paso("ventas " + v.getIdViaje(), problemas, () -> {
+                turno[0] = venderPasajes(v, pasajeros, turno[0], 4 + AZAR.nextInt(5));
+                creados[0]++;
+            });
+        }
+        paso("cierre de viajes", problemas, () -> new ControladorSimulacion().avanzar());
+        paso("pagos", problemas, () -> pagarAlgunos(pasados));
+        paso("cancelación de ejemplo", problemas, () -> cancelarUnoConReembolso(viajes, empresas.get(0), pasajeros));
+        paso("viaje en curso", problemas, () -> creados[0] += preparaViajeEnCurso(viajes, empresas, pasajeros));
+        paso("ventas futuras", problemas, () -> ventasFuturas(pasajeros));
+        paso("novedades", problemas, () -> novedades(pasajeros));
+        paso("recargas", problemas, () -> recargasExtra(pasajeros));
+        paso("avance final", problemas, () -> new ControladorSimulacion().avanzar());
+        // el marcador se escribe SIEMPRE: así un fallo parcial no duplica los datos en el siguiente arranque
+        try {
             new ControladorNotificaciones().enviar(ControladorNotificaciones.ADMIN, "Datos de demostración cargados",
-                    "Se cargaron pasajeros, reservas, facturas, novedades y pagos de ejemplo.", "");
+                    "Se cargaron pasajeros, reservas, facturas, novedades y pagos de ejemplo." + (problemas.isEmpty() ? "" : " Con " + problemas.size() + " aviso(s) en demo_log.txt."), "");
+            if (!problemas.isEmpty()) {
+                java.nio.file.Files.write(new File("demo_log.txt").toPath(), problemas, java.nio.charset.StandardCharsets.UTF_8);
+            }
             if (!MARCA.createNewFile()) {
                 System.err.println("No se pudo crear el marcador de datos de demostración");
             }
-        } catch (PersistenciaException | FachadaException | IOException | RuntimeException e) {
-            System.err.println("Datos de demostración incompletos: " + e.getMessage());
+        } catch (IOException e) {
+            System.err.println("No se pudo cerrar la carga de demostración: " + e.getMessage());
         }
-        return creados;
+        return creados[0];
+    }
+
+    @FunctionalInterface
+    private interface Paso {
+        void ejecutar() throws Exception;
+    }
+
+    /** Ejecuta un paso; si falla lo anota y sigue con el resto (una carga a medias es peor que una carga con un hueco). */
+    private static void paso(String nombre, List<String> problemas, Paso paso) {
+        try {
+            paso.ejecutar();
+        } catch (Exception e) {
+            String msg = nombre + ": " + e.getClass().getSimpleName() + " " + e.getMessage();
+            problemas.add(msg);
+            System.err.println("Demo: " + msg);
+        }
     }
 
     // ------------------------------------------------------------------ base
 
-    private static void quitarSufijoRQ() throws PersistenciaException {
+    private static void quitarSufijoAntiguo() throws PersistenciaException {
         Empresas dao = new Empresas("empresas.dat");
         for (Empresa e : dao.lista()) {
             if (e.getNombre() != null && e.getNombre().endsWith(" RQ")) {
@@ -125,7 +151,9 @@ public final class DatosDemostracion {
         List<Pasajero> nuevos = new ArrayList<>();
         for (int i = 0; i < NOMBRES.length; i++) {
             String cedula = DatosIniciales.cedulaConVerificador(String.format("17%07d", 3100000 + i * 7919 % 9000000));
-            if (existentes.stream().anyMatch(p -> cedula.equals(p.getCedula()))) {
+            Pasajero ya = existentes.stream().filter(p -> cedula.equals(p.getCedula())).findFirst().orElse(null);
+            if (ya != null) {
+                nuevos.add(ya); // carga anterior interrumpida: se reutilizan los pasajeros de ejemplo que ya existen
                 continue;
             }
             String[] partes = NOMBRES[i].toLowerCase().replace("á", "a").replace("é", "e").replace("í", "i").replace("ó", "o").replace("ú", "u").split(" ");
@@ -238,19 +266,23 @@ public final class DatosDemostracion {
                 continue;
             }
             Reserva reserva = creada.getDatosComoTipo(Reserva.class);
-            double total = reserva.getPrecioTotal();
-            double falta = total - saldo(p.getIdPasajero());
-            if (falta > 0) {
-                recargar(p, Math.ceil((falta + 5) / 5) * 5, compra.minusHours(2));
+            try {
+                double total = reserva.getPrecioTotal();
+                double falta = total - saldo(p.getIdPasajero());
+                if (falta > 0) {
+                    recargar(p, Math.ceil((falta + 5) / 5) * 5, compra.minusHours(2));
+                }
+                movimiento(p.getIdPasajero(), Movimiento.COMPRA, total, Movimiento.METODO_BILLETERA, Movimiento.APROBADA, reserva.getIdReserva(), compra);
+                Reserva final_ = FachadaArchivos.getInstance().obten(new Reserva(reserva.getIdReserva()));
+                List<String> nums = new ArrayList<>();
+                for (Integer n : asientos) nums.add(String.valueOf(n));
+                Reserva paraFactura = final_ != null ? final_ : reserva;
+                paraFactura.setNumerosAsientos(nums);
+                facturaPasaje(paraFactura, p, v, compra);
+            } catch (PersistenciaException | IOException | FachadaException | RuntimeException ex) {
+                System.err.println("Demo: compra descartada (" + ex.getMessage() + ")");
+                reservas.eliminarReserva(reserva.getIdReserva());
             }
-            movimiento(p.getIdPasajero(), Movimiento.COMPRA, total, Movimiento.METODO_BILLETERA, Movimiento.APROBADA, reserva.getIdReserva(), compra);
-            reservas.pagarReserva(reserva.getIdReserva());
-            Reserva final_ = FachadaArchivos.getInstance().obten(new Reserva(reserva.getIdReserva()));
-            List<String> nums = new ArrayList<>();
-            for (Integer n : asientos) nums.add(String.valueOf(n));
-            Reserva paraFactura = final_ != null ? final_ : reserva;
-            paraFactura.setNumerosAsientos(nums);
-            facturaPasaje(paraFactura, p, v, compra);
         }
         return turno + compradores;
     }

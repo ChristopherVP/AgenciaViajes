@@ -71,8 +71,6 @@ public class PantallaPortalConductor extends JFrame {
     private final JTextArea txtMensaje = new JTextArea(6, 30);
     private final JLabel lblContador = Tema.etiqueta("0 / 300");
     private final JLabel lblMensaje = Tema.mensaje();
-    private javax.swing.JButton btnCorreo;
-    private Novedad ultimaNovedad;
 
     private final DefaultTableModel modeloReportes = new DefaultTableModel(new String[]{"Fecha", "Tipo", "Asunto", "Estado"}, 0) {
         @Override
@@ -87,7 +85,7 @@ public class PantallaPortalConductor extends JFrame {
     public PantallaPortalConductor(Usuario usuario) {
         this.usuario = usuario;
         setTitle(objetosServicio.Marca.NOMBRE + " - Conductor: " + usuario.getNombre());
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
         lblAsignacion.setFont(Tema.fuente(Font.BOLD, 14f));
@@ -161,8 +159,6 @@ public class PantallaPortalConductor extends JFrame {
         aceptar.addActionListener(e -> aceptarViaje());
         javax.swing.JButton rechazar = Tema.boton("Rechazar", false);
         rechazar.addActionListener(e -> rechazarViaje());
-        javax.swing.JButton noPodre = Tema.boton("No podré realizar el viaje", false);
-        noPodre.addActionListener(e -> solicitarCancelacion());
         javax.swing.JButton vivo = Tema.boton("Seguimiento en vivo", false);
         vivo.addActionListener(e -> seguimiento());
         javax.swing.JButton verRuta = Tema.boton("Ver ruta en el mapa", false);
@@ -173,7 +169,6 @@ public class PantallaPortalConductor extends JFrame {
         botonesViaje.setOpaque(false);
         botonesViaje.add(aceptar);
         botonesViaje.add(rechazar);
-        botonesViaje.add(noPodre);
         botonesViaje.add(vivo);
         botonesViaje.add(verRuta);
         botonesViaje.add(chkProximos);
@@ -275,21 +270,6 @@ public class PantallaPortalConductor extends JFrame {
         actualizarTodo();
     }
 
-    private void solicitarCancelacion() {
-        Viaje v = viajeElegido();
-        if (v == null) {
-            return;
-        }
-        String motivo = javax.swing.JOptionPane.showInputDialog(this, "Cuéntale al administrador por qué no podrás realizar el viaje " + v.getIdViaje() + ":",
-                "Solicitar cancelación", javax.swing.JOptionPane.QUESTION_MESSAGE);
-        if (motivo == null) {
-            return;
-        }
-        ResultadoOperacion r = new control.ControladorDespacho().solicitarCancelacion(usuario, v.getIdViaje(), motivo);
-        if (r.isExito()) Tema.info(this, r.getMensaje()); else Tema.error(this, r.getMensaje());
-        actualizarTodo();
-    }
-
     private void seguimiento() {
         Viaje v = viajeElegido();
         if (v != null) {
@@ -356,18 +336,14 @@ public class PantallaPortalConductor extends JFrame {
 
         javax.swing.JButton enviar = Tema.boton("Enviar al administrador", true);
         enviar.addActionListener(e -> enviarReporte());
-        btnCorreo = Tema.boton("Enviar también por correo", false);
-        btnCorreo.setEnabled(false);
-        btnCorreo.addActionListener(e -> abrirCorreo());
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
         botones.setOpaque(false);
-        botones.add(btnCorreo);
         botones.add(enviar);
 
         JPanel p = new JPanel(new BorderLayout(0, 10));
         p.setBackground(Tema.FONDO);
         p.setBorder(BorderFactory.createEmptyBorder(18, 40, 18, 40));
-        JLabel nota = Tema.nota(740, "<html>Usa este formulario si <b>no puedes realizar un viaje</b>, el bus tiene una falla o quieres presentar una queja. El administrador recibirá el reporte y te responderá aquí.</html>");
+        JLabel nota = Tema.nota(740, "<html>Usa este formulario si <b>no puedes realizar un viaje</b> o el bus tiene una <b>falla</b> (elige el viaje: solo se puede avisar una vez por viaje y antes de que salga), o para una queja. El administrador recibe el reporte al instante y te responde aquí.</html>");
         nota.setForeground(Tema.TEXTO_SUAVE);
         p.add(nota, BorderLayout.NORTH);
         p.add(f, BorderLayout.CENTER);
@@ -387,33 +363,18 @@ public class PantallaPortalConductor extends JFrame {
         if (!r.isExito()) {
             return;
         }
-        ultimaNovedad = (Novedad) r.getDatos();
-        btnCorreo.setEnabled(!novedades.correosDeDestino(usuario).isEmpty());
+        Novedad enviada = (Novedad) r.getDatos();
+        // el formulario queda limpio para el siguiente reporte
+        txtAsunto.setText("");
+        txtMensaje.setText("");
+        cmbTipo.setSelectedIndex(0);
+        cmbViaje.setSelectedIndex(0);
         cargarReportes();
-    }
-
-    private void abrirCorreo() {
-        List<String> destinos = novedades.correosDeDestino(usuario);
-        if (ultimaNovedad == null || destinos.isEmpty()) {
-            Tema.error(this, "No hay un correo de administrador registrado para este reporte.");
-            return;
+        Object[] op = {"Descargar PDF", "Cerrar"};
+        if (javax.swing.JOptionPane.showOptionDialog(this, "Tu reporte " + enviada.getIdNovedad() + " fue enviado al administrador.\n¿Quieres descargar su PDF?",
+                "Reporte enviado", javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.INFORMATION_MESSAGE, null, op, op[0]) == 0) {
+            descargarReporte(enviada);
         }
-        try {
-            String asunto = "Reporte de conductor: " + ultimaNovedad.getAsunto();
-            String cuerpo = usuario.getNombre() + " (" + usuario.getCedula() + ")\n\n" + ultimaNovedad.getMensaje();
-            URI uri = new URI("mailto:" + String.join(",", destinos) + "?subject=" + codificar(asunto) + "&body=" + codificar(cuerpo));
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.MAIL)) {
-                Desktop.getDesktop().mail(uri);
-            } else {
-                Tema.error(this, "Este equipo no tiene un programa de correo configurado. El reporte ya quedó registrado en el sistema.");
-            }
-        } catch (Exception e) {
-            Tema.error(this, "No se pudo abrir el programa de correo: " + e.getMessage());
-        }
-    }
-
-    private static String codificar(String texto) {
-        return URLEncoder.encode(texto, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     // ------------------------------------------------------------------ mis reportes
@@ -441,8 +402,18 @@ public class PantallaPortalConductor extends JFrame {
         split.setBorder(null);
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> cargarReportes());
+        javax.swing.JButton pdf = Tema.boton("Descargar PDF del reporte", false);
+        pdf.addActionListener(e -> {
+            int fila = tablaReportes.getSelectedRow();
+            if (fila < 0 || fila >= reportes.size()) {
+                Tema.info(this, "Selecciona un reporte de la lista.");
+                return;
+            }
+            descargarReporte(reportes.get(fila));
+        });
         JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT));
         arriba.setOpaque(false);
+        arriba.add(pdf);
         arriba.add(actualizar);
         JPanel p = new JPanel(new BorderLayout(0, 8));
         p.setBackground(Tema.FONDO);
@@ -450,6 +421,11 @@ public class PantallaPortalConductor extends JFrame {
         p.add(arriba, BorderLayout.NORTH);
         p.add(split, BorderLayout.CENTER);
         return p;
+    }
+
+    private void descargarReporte(Novedad n) {
+        Descargas.guardarPdf(this, "Descargar reporte", control.ComprobantesPdf.nombreSugerido("Reporte", n.getIdNovedad()),
+                destino -> new control.ComprobantesPdf().novedad(destino, n));
     }
 
     @SuppressWarnings("unchecked")

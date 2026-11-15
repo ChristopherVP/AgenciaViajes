@@ -74,10 +74,9 @@ public class ControladorReservas {
                                             return new ResultadoOperacion(false, "Configuración inválida: El viaje no tiene precio asignado (ni específico ni por ruta).");
                                         } else {
                                             double precioTotal = this.calcularPrecio(precioBase, pasajero, cantidadAsientos);
-                                            String estadoInicial = "PENDIENTE_PAGO";
-                                            if (metodoPago != null && "EFECTIVO".equalsIgnoreCase(metodoPago)) {
-                                                estadoInicial = "CONFIRMADA";
-                                            }
+                                            // Reservar un asiento ya es comprarlo: la reserva nace CONFIRMADA (el cobro lo hace quien llama,
+                                            // y si falla elimina la reserva). No existe un estado intermedio "pendiente de pago".
+                                            String estadoInicial = "CONFIRMADA";
 
                                             Reserva reserva = new Reserva(idReserva, pasajero, viaje, cantidadAsientos, fechaReserva, estadoInicial, empresa, precioTotal, metodoPago, ninosBrazos);
                                             this.fachada.agrega(reserva);
@@ -404,8 +403,10 @@ public class ControladorReservas {
             Reserva reserva = this.fachada.obten(new Reserva(idReserva));
             if (reserva == null) {
                 return new ResultadoOperacion(false, "Reserva no encontrada");
+            } else if ("CONFIRMADA".equalsIgnoreCase(reserva.getEstado())) {
+                return new ResultadoOperacion(true, "La reserva ya está CONFIRMADA.");
             } else if (!"PENDIENTE_PAGO".equalsIgnoreCase(reserva.getEstado())) {
-                return new ResultadoOperacion(false, "La reserva no está pendiente de pago.");
+                return new ResultadoOperacion(false, "La reserva no se puede confirmar en su estado actual.");
             } else {
                 reserva.setEstado("CONFIRMADA");
                 this.fachada.actualiza(reserva);
@@ -671,5 +672,36 @@ public class ControladorReservas {
         public double getPorcentajeOcupacion() {
             return this.asientos.isEmpty() ? (double)0.0F : (double)(this.reservados + this.ocupados) * (double)100.0F / (double)this.asientos.size();
         }
+    }
+
+    /**
+     * Migración: el estado PENDIENTE_PAGO ya no existe. Las reservas que quedaron así y sí tienen su cobro pasan a CONFIRMADA;
+     * las que nunca se cobraron se eliminan (liberan sus asientos). Devuelve cuántas se corrigieron.
+     */
+    public int migrarPendientesDePago() {
+        int corregidas = 0;
+        try {
+            java.util.Set<String> cobradas = new java.util.HashSet<>();
+            for (objetosNegocio.Movimiento m : new persistencia.Movimientos("movimientos.dat").lista()) {
+                if (objetosNegocio.Movimiento.COMPRA.equals(m.getTipo())) {
+                    cobradas.add(m.getReferencia());
+                }
+            }
+            for (Reserva r : new ArrayList<>(this.fachada.consultaReservas())) {
+                if (!"PENDIENTE_PAGO".equalsIgnoreCase(r.getEstado())) {
+                    continue;
+                }
+                if (cobradas.contains(r.getIdReserva())) {
+                    r.setEstado("CONFIRMADA");
+                    this.fachada.actualiza(r);
+                } else {
+                    this.eliminarReserva(r.getIdReserva());
+                }
+                corregidas++;
+            }
+        } catch (Exception e) {
+            System.err.println("No se pudieron migrar las reservas pendientes: " + e.getMessage());
+        }
+        return corregidas;
     }
 }

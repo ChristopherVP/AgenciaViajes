@@ -12,3 +12,6 @@ respaldos/
 *.tmp
 
 # OJO: los archivos *.dat NO se ignoran a propósito: son la base de datos actual del sistema.
+
+
+oracle.properties

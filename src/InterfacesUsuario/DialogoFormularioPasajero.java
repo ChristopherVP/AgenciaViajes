@@ -148,29 +148,8 @@ public class DialogoFormularioPasajero extends JDialog {
         this.lblTipoPasajero.setFont(new Font("Arial", 1, 12));
         this.lblTipoPasajero.setForeground(new Color(0, 102, 204));
         panel.add(this.lblTipoPasajero, gbc);
-        gbc.gridx = 0;
-        gbc.gridy = 9;
-        panel.add(new JLabel("Empresa: *"), gbc);
-        gbc.gridx = 1;
         this.cmbEmpresa = new JComboBox<>();
-        this.cmbEmpresa.addItem("-- Seleccione Empresa --");
-
-        for(Empresa e : this.empresas) {
-            JComboBox var10000 = this.cmbEmpresa;
-            String var10001 = e.getIdEmpresa();
-            var10000.addItem(var10001 + " - " + e.getNombre());
-        }
-
-        panel.add(this.cmbEmpresa, gbc);
-        if (this.empresaPreseleccionada != null) {
-            for(int i = 0; i < this.cmbEmpresa.getItemCount(); ++i) {
-                if (((String)this.cmbEmpresa.getItemAt(i)).startsWith(this.empresaPreseleccionada.getIdEmpresa())) {
-                    this.cmbEmpresa.setSelectedIndex(i);
-                    this.cmbEmpresa.setEnabled(false);
-                    break;
-                }
-            }
-        }
+        this.cmbEmpresa.addItem("-");
 
         gbc.gridx = 0;
         gbc.gridy = 10;
@@ -228,14 +207,6 @@ public class DialogoFormularioPasajero extends JDialog {
 
         this.chkDiscapacidad.setSelected(this.pasajero.isDiscapacidad());
         this.actualizarTipoPasajero();
-        if (this.pasajero.getEmpresa() != null) {
-            for(int i = 0; i < this.cmbEmpresa.getItemCount(); ++i) {
-                if (((String)this.cmbEmpresa.getItemAt(i)).startsWith(this.pasajero.getEmpresa().getIdEmpresa())) {
-                    this.cmbEmpresa.setSelectedIndex(i);
-                    break;
-                }
-            }
-        }
 
     }
 
@@ -262,9 +233,7 @@ public class DialogoFormularioPasajero extends JDialog {
                 } else {
                     String telefono = this.txtTelefono.getText().trim();
                     if (telefono.isEmpty() || telefono.length() >= 9 && telefono.length() <= 10) {
-                        if (this.cmbEmpresa.getSelectedIndex() == 0) {
-                            JOptionPane.showMessageDialog(this, "Debe seleccionar una empresa", "Error de Validación", 0);
-                        } else {
+                        {
                             try {
                                 Pasajeros pasajerosDB = new Pasajeros("pasajeros.dat");
                                 List<Pasajero> lista = pasajerosDB.lista();
@@ -301,9 +270,6 @@ public class DialogoFormularioPasajero extends JDialog {
                             }
 
                             this.pasajero.setDiscapacidad(this.chkDiscapacidad.isSelected());
-                            String empresaSeleccionada = (String)this.cmbEmpresa.getSelectedItem();
-                            String idEmpresa = empresaSeleccionada.split(" - ")[0].trim();
-                            this.pasajero.setEmpresa(new Empresa(idEmpresa));
                             this.confirmado = true;
                             this.dispose();
                         }

@@ -359,7 +359,7 @@ public class ControladorViajes {
     }
 
     /** El bus no puede estar en dos viajes a la vez: se comparan fecha Y hora, con un descanso entre uno y otro. */
-    private ResultadoOperacion verificarDisponibilidadBus(String idBus, Fecha fechaSalida, Fecha fechaLlegada, String horaSalida, String horaLlegada, String idViajeNuevo) {
+    public ResultadoOperacion verificarDisponibilidadBus(String idBus, Fecha fechaSalida, Fecha fechaLlegada, String horaSalida, String horaLlegada, String idViajeNuevo) {
         try {
             java.time.LocalDateTime ini = instante(fechaSalida, horaSalida, false);
             java.time.LocalDateTime fin = instante(fechaLlegada, horaLlegada, true);

@@ -45,7 +45,7 @@ public class DialogoInformes extends JDialog {
     public DialogoInformes(Window padre, Usuario usuario) {
         super(padre, "Informes en PDF", Dialog.ModalityType.APPLICATION_MODAL);
         this.usuario = usuario;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Informes en PDF", "Un informe formal para analizar los datos del sistema"), BorderLayout.NORTH);
 

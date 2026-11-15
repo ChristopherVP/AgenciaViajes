@@ -87,7 +87,7 @@ public class PantallaRegistro extends JDialog {
 
     public PantallaRegistro(Window padre) {
         super(padre, "Crear cuenta", Dialog.ModalityType.APPLICATION_MODAL);
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado("Crear cuenta", "Elige tu rol y completa tus datos"), BorderLayout.NORTH);
 

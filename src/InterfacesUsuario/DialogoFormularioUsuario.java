@@ -55,7 +55,7 @@ public class DialogoFormularioUsuario extends JDialog {
         this.actor = actor;
         this.editando = editando;
         this.alGuardar = alGuardar;
-        setIconImage(IconoRQ.crear(64));
+        setIconImage(IconoApp.crear(64));
         setLayout(new BorderLayout());
         add(Tema.encabezado(editando == null ? "Nuevo administrador" : "Editar usuario",
                 editando == null ? "Crea una cuenta de administración con su cargo" : editando.getLogin() + " · " + editando.getTipo()), BorderLayout.NORTH);

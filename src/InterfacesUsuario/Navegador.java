@@ -31,21 +31,38 @@ public final class Navegador {
             }
             usuario.setClavePendiente(false);
         }
+        // La ventana de acceso sigue visible (con un aviso "Iniciando sesión...") hasta que la cuenta esté lista:
+        // así la aplicación nunca parece cerrarse ni queda un hueco sin ventanas.
+        PantallaCarga carga = new PantallaCarga(origen, "Iniciando sesión...");
+        carga.mostrar();
+        javax.swing.Timer espera = new javax.swing.Timer(60, e -> construirYMostrar(usuario, origen, carga));
+        espera.setRepeats(false);
+        espera.start();
+    }
+
+    private static void construirYMostrar(Usuario usuario, Window origen, PantallaCarga carga) {
+        Rol rol = usuario.getRol();
+        JFrame ventana;
+        try {
+            if (rol == Rol.PASAJERO) {
+                ventana = new PantallaPortalPasajero(usuario);
+            } else if (rol == Rol.CONDUCTOR) {
+                ventana = new PantallaPortalConductor(usuario);
+            } else {
+                ventana = new PantallaPrincipal(usuario);
+            }
+        } catch (RuntimeException ex) {
+            carga.cerrar();
+            Tema.error(origen, "No se pudo abrir tu cuenta: " + ex.getMessage());
+            return;
+        }
+        ventana.setIconImage(IconoApp.crear(64));
+        ventana.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        ventana.setVisible(true);
+        carga.cerrar();
         if (origen != null) {
             origen.dispose();
         }
-        Rol rol = usuario.getRol();
-        JFrame ventana;
-        if (rol == Rol.PASAJERO) {
-            ventana = new PantallaPortalPasajero(usuario);
-        } else if (rol == Rol.CONDUCTOR) {
-            ventana = new PantallaPortalConductor(usuario);
-        } else {
-            ventana = new PantallaPrincipal(usuario);
-        }
-        ventana.setIconImage(IconoRQ.crear(64));
-        ventana.setExtendedState(JFrame.MAXIMIZED_BOTH);
-        ventana.setVisible(true);
         if (!usuario.tienePreguntaSeguridad()) {
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(ventana,
                     "Tu cuenta aún no tiene pregunta de seguridad.\nConfigúrala en Cuenta ▸ Mi perfil para poder recuperar tu contraseña si la olvidas.",
@@ -61,10 +78,10 @@ public final class Navegador {
         if (respuesta != 0) {
             return;
         }
+        new PantallaInicioSesion().setVisible(true);
         if (actual != null) {
             actual.dispose();
         }
-        new PantallaInicioSesion().setVisible(true);
     }
 
     /** Copia en "destino" los datos actualizados de la cuenta para que la ventana abierta los refleje. */

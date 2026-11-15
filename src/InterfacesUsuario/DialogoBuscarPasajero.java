@@ -101,7 +101,7 @@ public class DialogoBuscarPasajero extends JDialog {
         String txt = this.txtBuscar.getText().toUpperCase();
         if (this.listaCompleta != null) {
             for(Pasajero p : this.listaCompleta) {
-                if ((this.empresaFiltro == null || p.getEmpresa() != null && p.getEmpresa().getIdEmpresa().equals(this.empresaFiltro.getIdEmpresa())) && (p.getNombre().toUpperCase().contains(txt) || p.getCedula().contains(txt))) {
+                if ((true) && (p.getNombre().toUpperCase().contains(txt) || p.getCedula().contains(txt))) {
                     this.modelo.addRow(new Object[]{p.getIdPasajero(), p.getNombre(), p.getCedula(), p.getTelefono()});
                 }
             }
