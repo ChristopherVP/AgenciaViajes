@@ -28,7 +28,7 @@ public class PanelMisPagos extends JPanel {
     private final ControladorTarjetas tarjetas = new ControladorTarjetas();
     private final Usuario usuario;
     private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"Viaje", "Salida", "Ruta", "Pasajeros", "Recaudado", "Mi pago (80 %)", "Estado", "Pagado a", "Factura"}, 0) {
+            new String[]{"Viaje", "Salida", "Ruta", "Pasajeros", "Recaudado", "Mi pago (80 %)", "Estado", "Llegada", "Pagado a", "Factura"}, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
             return false;
@@ -51,6 +51,8 @@ public class PanelMisPagos extends JPanel {
         cambiar.addActionListener(e -> new DialogoTarjetaCobro(javax.swing.SwingUtilities.getWindowAncestor(this), usuario, this::cargar).setVisible(true));
         JButton factura = Tema.boton("Ver factura del pago", true);
         factura.addActionListener(e -> verFactura());
+        JButton pdf = Tema.boton("Descargar PDF", false);
+        pdf.addActionListener(e -> descargarPdf());
         JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> cargar());
         JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
@@ -62,7 +64,8 @@ public class PanelMisPagos extends JPanel {
         botones.setOpaque(false);
         botones.add(actualizar);
         botones.add(factura);
-        JLabel regla = Tema.etiqueta("Ganas el 80 % de lo que pagaron los pasajeros por cada viaje. Notifica el viaje realizado y finanzas te paga a tu tarjeta.");
+        botones.add(pdf);
+        JLabel regla = Tema.etiqueta("Ganas el 80 % de lo que pagaron los pasajeros por cada viaje. El pago se libera al llegar el bus a destino y finanzas lo deposita en tu tarjeta.");
         regla.setForeground(Tema.TEXTO_SUAVE);
         JPanel sur = new JPanel(new BorderLayout());
         sur.setOpaque(false);
@@ -90,11 +93,12 @@ public class PanelMisPagos extends JPanel {
         double pagado = 0, pendiente = 0;
         for (Liquidacion l : actuales) {
             boolean paga = Liquidacion.PAGADA.equals(l.getEstado());
+            String estado = paga ? "PAGADO" : Liquidacion.PROGRAMADA.equals(l.getEstado()) ? "PROGRAMADO (en espera)" : "PENDIENTE DE PAGO";
             if (paga) pagado += l.getMonto(); else pendiente += l.getMonto();
             modelo.addRow(new Object[]{l.getIdViaje(), l.getFechaViaje(), l.getRuta(), l.getPasajeros(), String.format("$%.2f", l.getRecaudado()),
-                    String.format("$%.2f", l.getMonto()), paga ? "PAGADO" : "PENDIENTE", l.getTarjeta(), l.getNumeroFactura().isEmpty() ? "—" : l.getNumeroFactura()});
+                    String.format("$%.2f", l.getMonto()), estado, l.getLlegadaViaje().isEmpty() ? "—" : l.getLlegadaViaje(), l.getTarjeta(), l.getNumeroFactura().isEmpty() ? "—" : l.getNumeroFactura()});
         }
-        Tema.mostrarMensaje(lblTotales, String.format("Ya te pagaron: $%.2f · Pendiente de pago: $%.2f", pagado, pendiente), true);
+        Tema.mostrarMensaje(lblTotales, String.format("Ya te pagaron: $%.2f · Por cobrar: $%.2f", pagado, pendiente), true);
     }
 
     private void verFactura() {
@@ -111,5 +115,19 @@ public class PanelMisPagos extends JPanel {
             return;
         }
         new DialogoFactura(javax.swing.SwingUtilities.getWindowAncestor(this), c).setVisible(true);
+    }
+
+    private void descargarPdf() {
+        int fila = tabla.getSelectedRow();
+        if (fila < 0) {
+            Tema.info(this, "Selecciona un pago.");
+            return;
+        }
+        String viaje = String.valueOf(modelo.getValueAt(fila, 0));
+        Liquidacion l = actuales.stream().filter(x -> x.getIdViaje().equals(viaje)).findFirst().orElse(null);
+        if (l != null) {
+            Descargas.guardarPdf(this, "Descargar pago", control.ComprobantesPdf.nombreSugerido("Pago", l.getIdLiquidacion()),
+                    destino -> new control.ComprobantesPdf().pagoConductor(destino, l));
+        }
     }
 }

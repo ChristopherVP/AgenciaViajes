@@ -86,7 +86,7 @@ public class PantallaPortalConductor extends JFrame {
 
     public PantallaPortalConductor(Usuario usuario) {
         this.usuario = usuario;
-        setTitle("RQ - Conductor: " + usuario.getNombre());
+        setTitle(objetosServicio.Marca.NOMBRE + " - Conductor: " + usuario.getNombre());
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
@@ -95,6 +95,7 @@ public class PantallaPortalConductor extends JFrame {
         JTabbedPane tabs = new JTabbedPane();
         tabs.setFont(Tema.fuente(Font.BOLD, 14f));
         tabs.addTab("Mis viajes", crearPanelViajes());
+        tabs.addTab("Avisos", crearPanelAvisos());
         tabs.addTab("Reportar al administrador", crearPanelReporte());
         tabs.addTab("Mis reportes", crearPanelReportes());
         panelPagos = new PanelMisPagos(usuario);
@@ -105,6 +106,18 @@ public class PantallaPortalConductor extends JFrame {
         add(tabs, BorderLayout.CENTER);
         cargarViajes();
         cargarReportes();
+        cargarAvisos();
+        avisarNuevos();
+        new javax.swing.Timer(5000, e -> {
+            new control.ControladorSimulacion().avanzar();
+            int fila = tablaViajes.getSelectedRow();
+            cargarViajes();
+            if (fila >= 0 && fila < tablaViajes.getRowCount()) {
+                tablaViajes.setRowSelectionInterval(fila, fila);
+            }
+            cargarAvisos();
+            avisarNuevos();
+        }).start();
         setPreferredSize(new Dimension(1000, 680));
         pack();
         setLocationRelativeTo(null);
@@ -144,19 +157,31 @@ public class PantallaPortalConductor extends JFrame {
         chkProximos.addActionListener(e -> cargarViajes());
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> cargarViajes());
-        javax.swing.JButton notificar = Tema.boton("Notificar viaje realizado", true);
-        notificar.addActionListener(e -> notificarViaje());
+        javax.swing.JButton aceptar = Tema.boton("Aceptar viaje", true);
+        aceptar.addActionListener(e -> aceptarViaje());
+        javax.swing.JButton rechazar = Tema.boton("Rechazar", false);
+        rechazar.addActionListener(e -> rechazarViaje());
+        javax.swing.JButton noPodre = Tema.boton("No podré realizar el viaje", false);
+        noPodre.addActionListener(e -> solicitarCancelacion());
+        javax.swing.JButton vivo = Tema.boton("Seguimiento en vivo", false);
+        vivo.addActionListener(e -> seguimiento());
         javax.swing.JButton verRuta = Tema.boton("Ver ruta en el mapa", false);
         verRuta.addActionListener(e -> verRuta());
-        JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT, 12, 0));
+        JPanel arriba = new JPanel(new BorderLayout(0, 4));
         arriba.setOpaque(false);
-        arriba.add(notificar);
-        arriba.add(verRuta);
-        arriba.add(chkProximos);
-        arriba.add(actualizar);
-        JLabel nota = Tema.etiqueta("Cuando termines un viaje pulsa \"Notificar viaje realizado\": finanzas te paga el 80 % de lo recaudado.");
+        JPanel botonesViaje = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        botonesViaje.setOpaque(false);
+        botonesViaje.add(aceptar);
+        botonesViaje.add(rechazar);
+        botonesViaje.add(noPodre);
+        botonesViaje.add(vivo);
+        botonesViaje.add(verRuta);
+        botonesViaje.add(chkProximos);
+        botonesViaje.add(actualizar);
+        JLabel nota = Tema.etiqueta("Acepta los viajes que te asigna el administrador (necesitas una tarjeta de cobro validada). Tu pago del 80 % se libera al llegar el bus a destino.");
         nota.setForeground(Tema.TEXTO_SUAVE);
-        arriba.add(nota);
+        arriba.add(botonesViaje, BorderLayout.NORTH);
+        arriba.add(nota, BorderLayout.SOUTH);
         p.add(arriba, BorderLayout.NORTH);
         return p;
     }
@@ -171,6 +196,8 @@ public class PantallaPortalConductor extends JFrame {
         }
         @SuppressWarnings("unchecked")
         List<Viaje> todos = (List<Viaje>) r.getDatos();
+        todos = new ArrayList<>(todos);
+        java.util.Collections.reverse(todos);
         viajes = new ArrayList<>();
         idsViaje.clear();
         cmbViaje.removeAllItems();
@@ -206,23 +233,74 @@ public class PantallaPortalConductor extends JFrame {
         return String.valueOf(modeloViajes.getValueAt(fila, 0));
     }
 
-    private void notificarViaje() {
+    private Viaje viajeElegido() {
         String id = viajeSeleccionado();
-        if (id == null) {
+        return id == null ? null : viajes.stream().filter(v -> v.getIdViaje().equals(id)).findFirst().orElse(null);
+    }
+
+    private void aceptarViaje() {
+        Viaje v = viajeElegido();
+        if (v == null) {
             return;
         }
-        Object[] opciones = {"Sí, se realizó con éxito", "Cancelar"};
-        if (javax.swing.JOptionPane.showOptionDialog(this, "¿Confirmas que el viaje " + id + " se realizó con éxito?\nSe calculará tu pago (80 % de lo que pagaron los pasajeros) y\nfinanzas lo depositará en tu tarjeta de débito.",
-                "Notificar viaje realizado", javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.QUESTION_MESSAGE, null, opciones, opciones[1]) != 0) {
+        String errorTarjeta = control.ControladorDespacho.errorTarjeta(usuario.getIdPerfil());
+        if (errorTarjeta != null) {
+            Object[] op = {"Registrar tarjeta ahora", "Cerrar"};
+            if (javax.swing.JOptionPane.showOptionDialog(this, errorTarjeta + "\n\nSin una tarjeta de cobro validada no puedes aceptar viajes.",
+                    "Falta tu tarjeta de cobro", javax.swing.JOptionPane.DEFAULT_OPTION, javax.swing.JOptionPane.WARNING_MESSAGE, null, op, op[0]) == 0) {
+                new DialogoTarjetaCobro(this, usuario, this::actualizarTodo).setVisible(true);
+            }
             return;
         }
-        ResultadoOperacion r = new control.ControladorLiquidaciones().notificarViajeRealizado(usuario, id);
-        if (!r.isExito()) {
+        ResultadoOperacion r = new control.ControladorDespacho().aceptar(usuario, v.getIdViaje());
+        if (r.isExito()) {
+            Tema.info(this, r.getMensaje());
+        } else {
             Tema.error(this, r.getMensaje());
+        }
+        actualizarTodo();
+    }
+
+    private void rechazarViaje() {
+        Viaje v = viajeElegido();
+        if (v == null) {
             return;
         }
-        Tema.info(this, r.getMensaje());
+        if (javax.swing.JOptionPane.showConfirmDialog(this, "¿Rechazar el viaje " + v.getIdViaje() + "? Volverá al administrador para reasignarlo.",
+                "Rechazar viaje", javax.swing.JOptionPane.YES_NO_OPTION) != javax.swing.JOptionPane.YES_OPTION) {
+            return;
+        }
+        ResultadoOperacion r = new control.ControladorDespacho().rechazar(usuario, v.getIdViaje());
+        if (r.isExito()) Tema.info(this, r.getMensaje()); else Tema.error(this, r.getMensaje());
+        actualizarTodo();
+    }
+
+    private void solicitarCancelacion() {
+        Viaje v = viajeElegido();
+        if (v == null) {
+            return;
+        }
+        String motivo = javax.swing.JOptionPane.showInputDialog(this, "Cuéntale al administrador por qué no podrás realizar el viaje " + v.getIdViaje() + ":",
+                "Solicitar cancelación", javax.swing.JOptionPane.QUESTION_MESSAGE);
+        if (motivo == null) {
+            return;
+        }
+        ResultadoOperacion r = new control.ControladorDespacho().solicitarCancelacion(usuario, v.getIdViaje(), motivo);
+        if (r.isExito()) Tema.info(this, r.getMensaje()); else Tema.error(this, r.getMensaje());
+        actualizarTodo();
+    }
+
+    private void seguimiento() {
+        Viaje v = viajeElegido();
+        if (v != null) {
+            new DialogoSeguimientoViaje(this, v).setVisible(true);
+        }
+    }
+
+    private void actualizarTodo() {
         cargarViajes();
+        cargarReportes();
+        cargarAvisos();
         panelPagos.cargar();
     }
 
@@ -387,5 +465,62 @@ public class PantallaPortalConductor extends JFrame {
             String fecha = n.getFecha() == null ? "" : String.format("%02d/%02d/%04d", n.getFecha().getDia(), n.getFecha().getMes(), n.getFecha().getAnio());
             modeloReportes.addRow(new Object[]{fecha, ControladorNovedades.TIPOS.getOrDefault(n.getTipo(), n.getTipo()), n.getAsunto(), n.getEstado()});
         }
+    }
+
+    // ------------------------------------------------------------------ avisos
+
+    private final control.ControladorNotificaciones notificaciones = new control.ControladorNotificaciones();
+    private final DefaultTableModel modeloAvisos = new DefaultTableModel(new String[]{"Fecha", "Aviso", "Detalle"}, 0) {
+        @Override
+        public boolean isCellEditable(int r, int c) {
+            return false;
+        }
+    };
+    private boolean mostrandoAviso;
+
+    private JPanel crearPanelAvisos() {
+        JTable tabla = new JTable(modeloAvisos);
+        Tema.tabla(tabla);
+        tabla.getColumnModel().getColumn(2).setPreferredWidth(600);
+        javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
+        actualizar.addActionListener(e -> cargarAvisos());
+        JPanel arriba = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        arriba.setOpaque(false);
+        arriba.add(actualizar);
+        JPanel p = new JPanel(new BorderLayout(0, 8));
+        p.setBackground(Tema.FONDO);
+        p.setBorder(BorderFactory.createEmptyBorder(14, 16, 14, 16));
+        p.add(arriba, BorderLayout.NORTH);
+        p.add(new JScrollPane(tabla), BorderLayout.CENTER);
+        return p;
+    }
+
+    private void cargarAvisos() {
+        modeloAvisos.setRowCount(0);
+        for (control.ControladorNotificaciones.Aviso a : notificaciones.deDestino(usuario.getIdPerfil())) {
+            modeloAvisos.addRow(new Object[]{a.getFecha().format(FORMATO), (a.isLeido() ? "" : "● ") + a.getTitulo(), a.getMensaje()});
+        }
+    }
+
+    /** Muestra una ventana con los avisos nuevos (viaje asignado, pagos, respuestas) y los marca como leídos. */
+    private void avisarNuevos() {
+        if (mostrandoAviso) {
+            return;
+        }
+        List<control.ControladorNotificaciones.Aviso> nuevos = notificaciones.sinLeer(usuario.getIdPerfil());
+        if (nuevos.isEmpty()) {
+            return;
+        }
+        mostrandoAviso = true;
+        StringBuilder sb = new StringBuilder();
+        for (control.ControladorNotificaciones.Aviso a : nuevos) {
+            sb.append("• ").append(a.getTitulo()).append("\n  ").append(a.getMensaje()).append("\n\n");
+        }
+        notificaciones.marcarLeidos(usuario.getIdPerfil());
+        javax.swing.SwingUtilities.invokeLater(() -> {
+            javax.swing.JOptionPane.showMessageDialog(this, sb.toString().trim(), "Tienes " + nuevos.size() + " aviso(s) nuevo(s)", javax.swing.JOptionPane.INFORMATION_MESSAGE);
+            mostrandoAviso = false;
+            cargarAvisos();
+        });
     }
 }

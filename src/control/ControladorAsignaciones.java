@@ -151,8 +151,8 @@ public class ControladorAsignaciones {
             if (a == null) {
                 return c.getNombre() + " aún no tiene bus ni ruta asignados. Asígnalos primero en la pestaña Conductores.";
             }
-            if (!a.getIdBus().equals(idBus) || !a.getIdRuta().equals(idRuta)) {
-                return c.getNombre() + " tiene asignado: " + describir(idConductor) + ". El viaje debe usar ese mismo bus y esa misma ruta.";
+            if (!a.getIdBus().equals(idBus)) {
+                return c.getNombre() + " tiene asignado: " + describir(idConductor) + ". El viaje debe usar ese mismo bus (la ruta de cada viaje la define el despacho según dónde esté el conductor).";
             }
             return null;
         } catch (Exception e) {

@@ -11,6 +11,7 @@ public class Comprobante {
     public static final String PASAJE = "PASAJE";
     public static final String RECARGA = "RECARGA";
     public static final String LIQUIDACION = "LIQUIDACION";
+    public static final String REEMBOLSO = "REEMBOLSO";
     private static final DateTimeFormatter FORMATO = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private String numero = "";
@@ -52,6 +53,7 @@ public class Comprobante {
         switch (tipo) {
             case RECARGA: return "Recarga de billetera";
             case LIQUIDACION: return "Pago a conductor";
+            case REEMBOLSO: return "Reembolso (nota de crédito)";
             default: return "Pasaje";
         }
     }
@@ -77,3 +79,4 @@ public class Comprobante {
         return c;
     }
 }
+

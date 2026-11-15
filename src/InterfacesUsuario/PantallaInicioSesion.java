@@ -31,7 +31,7 @@ public class PantallaInicioSesion extends JFrame {
     private final JLabel lblMensaje = Tema.mensaje();
 
     public PantallaInicioSesion() {
-        setTitle("RQ - Iniciar sesión");
+        setTitle(objetosServicio.Marca.NOMBRE + " - Iniciar sesión");
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         // pantalla completa: marca a la izquierda y formulario centrado a la derecha
@@ -66,13 +66,13 @@ public class PantallaInicioSesion extends JFrame {
         g.gridy = 0;
         g.insets = new Insets(0, 0, 14, 0);
         p.add(new JLabel(IconoRQ.icono(150)), g);
-        JLabel t = new JLabel("RQ");
+        JLabel t = new JLabel(objetosServicio.Marca.NOMBRE);
         t.setFont(Tema.fuente(Font.BOLD, 40f));
         t.setForeground(Color.WHITE);
         g.gridy = 1;
         g.insets = new Insets(0, 0, 4, 0);
         p.add(t, g);
-        JLabel s = new JLabel("<html><div style='text-align:center;width:230px'>Sistema de Transporte Interprovincial<br><br>"
+        JLabel s = new JLabel("<html><div style='text-align:center;width:230px'>Agencia de viajes en bus interprovincial<br><br>"
                 + "Compra tus pasajes, administra tus viajes y mantén todo el transporte en orden.</div></html>");
         s.setFont(Tema.fuente(Font.PLAIN, 13f));
         s.setForeground(new Color(0xCFE3F3));

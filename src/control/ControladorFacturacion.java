@@ -33,6 +33,10 @@ public class ControladorFacturacion {
         public double recargasAcreditadas;
         public double pagadoConductores;
         public double porPagarConductores;
+        /** Dinero devuelto a las billeteras por viajes cancelados (notas de crédito). */
+        public double devoluciones;
+        /** Pagos a conductores de viajes que ya se aceptaron pero todavía no terminan. */
+        public double programadoConductores;
         public int facturas;
 
         /** Lo que se queda la plataforma de los viajes ya liquidados (el 20 %). */
@@ -41,8 +45,13 @@ public class ControladorFacturacion {
 
     // ------------------------------------------------------------------ emisión
 
-    public synchronized Comprobante emitir(String tipo, String idTitular, String nombre, String cedula, String concepto, String detalle,
-                                           double total, String referencia, String emisor) throws IOException {
+    public Comprobante emitir(String tipo, String idTitular, String nombre, String cedula, String concepto, String detalle,
+                              double total, String referencia, String emisor) throws IOException {
+        return emitirConFecha(tipo, idTitular, nombre, cedula, concepto, detalle, total, referencia, emisor, LocalDateTime.now());
+    }
+
+    public synchronized Comprobante emitirConFecha(String tipo, String idTitular, String nombre, String cedula, String concepto, String detalle,
+                                                   double total, String referencia, String emisor, LocalDateTime fecha) throws IOException {
         Comprobante c = new Comprobante();
         c.setNumero(String.format("001-001-%09d", ALMACEN.leer().size() + 1));
         c.setTipo(tipo);
@@ -52,7 +61,7 @@ public class ControladorFacturacion {
         c.setConcepto(concepto);
         c.setDetalle(detalle);
         c.setTotal(total);
-        c.setFecha(LocalDateTime.now());
+        c.setFecha(fecha);
         c.setReferencia(referencia);
         c.setEmisor(emisor);
         ALMACEN.agregar(c.aFila());
@@ -69,9 +78,9 @@ public class ControladorFacturacion {
             if (reserva.getViaje() != null && ControladorCompras.salidaDe(reserva.getViaje()) != null) {
                 salida = ControladorCompras.salidaDe(reserva.getViaje()).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
             }
-            String detalle = "Reserva " + reserva.getIdReserva() + "\nViaje " + (reserva.getViaje() == null ? "" : reserva.getViaje().getIdViaje())
-                    + "\nSalida " + salida + "\nAsientos " + String.join(", ", reserva.getNumerosAsientos())
-                    + "\nCantidad " + reserva.getCantidadAsientos() + " asiento(s)\nPagado con la billetera RQ"
+            String detalle = "Reserva: " + reserva.getIdReserva() + "\nViaje: " + (reserva.getViaje() == null ? "" : reserva.getViaje().getIdViaje())
+                    + "\nSalida: " + salida + "\nAsientos: " + String.join(", ", reserva.getNumerosAsientos())
+                    + "\nCantidad: " + reserva.getCantidadAsientos() + " asiento(s)\nPagado con: billetera " + objetosServicio.Marca.NOMBRE
                     + "\nCompra definitiva: no admite devoluciones";
             return emitir(Comprobante.PASAJE, p.getIdPasajero(), p.getNombre(), p.getCedula(), "Pasaje " + ruta, detalle,
                     reserva.getPrecioTotal(), reserva.getIdReserva(), empresa);
@@ -90,13 +99,27 @@ public class ControladorFacturacion {
         }
     }
 
+    /** Nota de crédito: el dinero de un pasaje de un viaje cancelado vuelve a la billetera del pasajero. */
+    public Comprobante emitirReembolso(Movimiento m, String motivo) {
+        try {
+            Pasajero p = new Pasajeros("pasajeros.dat").obten(new Pasajero(m.getIdPasajero()));
+            String detalle = "Movimiento: " + m.getIdMovimiento() + "\nPasaje (reserva): " + m.getReferencia() + "\nMotivo: " + motivo
+                    + "\nAcreditado a: billetera " + objetosServicio.Marca.NOMBRE;
+            return emitir(Comprobante.REEMBOLSO, m.getIdPasajero(), p == null ? "" : p.getNombre(), p == null ? "" : p.getCedula(),
+                    "Reembolso por viaje cancelado", detalle, m.getMonto(), m.getIdMovimiento(), objetosServicio.Marca.SISTEMA);
+        } catch (IOException | RuntimeException | excepciones.PersistenciaException e) {
+            System.err.println("No se pudo emitir la nota de crédito: " + e.getMessage());
+            return null;
+        }
+    }
+
     public Comprobante emitirRecarga(Movimiento m) {
         try {
             Pasajero p = new Pasajeros("pasajeros.dat").obten(new Pasajero(m.getIdPasajero()));
-            String detalle = "Movimiento " + m.getIdMovimiento() + "\nMétodo " + m.getMetodo() + "\nReferencia " + m.getReferencia()
-                    + "\nAcreditado a la billetera RQ";
+            String detalle = "Movimiento: " + m.getIdMovimiento() + "\nMétodo: " + m.getMetodo() + "\nReferencia: " + m.getReferencia()
+                    + "\nAcreditado a: billetera " + objetosServicio.Marca.NOMBRE;
             return emitir(Comprobante.RECARGA, m.getIdPasajero(), p == null ? "" : p.getNombre(), p == null ? "" : p.getCedula(),
-                    "Recarga de billetera", detalle, m.getMonto(), m.getIdMovimiento(), "RQ - Sistema de Transporte");
+                    "Recarga de billetera", detalle, m.getMonto(), m.getIdMovimiento(), objetosServicio.Marca.SISTEMA);
         } catch (IOException | RuntimeException | excepciones.PersistenciaException e) {
             System.err.println("No se pudo emitir la factura de la recarga: " + e.getMessage());
             return null;
@@ -104,14 +127,18 @@ public class ControladorFacturacion {
     }
 
     public Comprobante emitirLiquidacion(Liquidacion l) {
+        return emitirLiquidacionConFecha(l, LocalDateTime.now());
+    }
+
+    public Comprobante emitirLiquidacionConFecha(Liquidacion l, LocalDateTime fecha) {
         try {
             Conductor c = new Conductores("conductores.dat").obten(new Conductor(l.getIdConductor()));
-            String detalle = "Viaje " + l.getIdViaje() + " · " + l.getRuta() + "\nSalida " + l.getFechaViaje()
-                    + "\nPasajeros transportados " + l.getPasajeros() + "\nRecaudado en pasajes " + String.format("$%.2f", l.getRecaudado())
-                    + "\nParticipación del conductor " + (int) Liquidacion.PORCENTAJE_CONDUCTOR + " %" + (l.getPartes() > 1 ? " (dividida entre " + l.getPartes() + " conductores)" : "")
-                    + "\nPagado a " + l.getTarjeta();
-            return emitir(Comprobante.LIQUIDACION, l.getIdConductor(), l.getNombreConductor(), c == null ? "" : c.getCedula(),
-                    "Pago por el viaje " + l.getIdViaje(), detalle, l.getMonto(), l.getIdLiquidacion(), l.getEmpresa());
+            String detalle = "Viaje " + l.getIdViaje() + " · " + l.getRuta() + "\nSalida: " + l.getFechaViaje()
+                    + "\nPasajeros transportados: " + l.getPasajeros() + "\nRecaudado en pasajes: " + String.format("$%.2f", l.getRecaudado())
+                    + "\nParticipación del conductor: " + (int) Liquidacion.PORCENTAJE_CONDUCTOR + " %" + (l.getPartes() > 1 ? " (dividida entre " + l.getPartes() + " conductores)" : "")
+                    + "\nPagado a: " + l.getTarjeta();
+            return emitirConFecha(Comprobante.LIQUIDACION, l.getIdConductor(), l.getNombreConductor(), c == null ? "" : c.getCedula(),
+                    "Pago por el viaje " + l.getIdViaje(), detalle, l.getMonto(), l.getIdLiquidacion(), l.getEmpresa(), fecha);
         } catch (IOException | RuntimeException | excepciones.PersistenciaException e) {
             System.err.println("No se pudo emitir la factura del pago: " + e.getMessage());
             return null;
@@ -127,6 +154,15 @@ public class ControladorFacturacion {
         }
         lista.sort(Comparator.comparing(Comprobante::getNumero).reversed());
         return lista;
+    }
+
+    /** Todas las facturas, para los informes internos (sin filtro de permisos: quien llama ya validó el acceso a Reportes). */
+    public List<Comprobante> todasParaInformes() {
+        try {
+            return todas();
+        } catch (IOException e) {
+            return new ArrayList<>();
+        }
     }
 
     /** Todas las facturas de todos los movimientos (solo cargos con acceso a Facturas). */
@@ -176,6 +212,7 @@ public class ControladorFacturacion {
                     case Comprobante.PASAJE: r.ventasPasajes += c.getTotal(); break;
                     case Comprobante.RECARGA: r.recargasAcreditadas += c.getTotal(); break;
                     case Comprobante.LIQUIDACION: r.pagadoConductores += c.getTotal(); break;
+                    case Comprobante.REEMBOLSO: r.devoluciones += c.getTotal(); break;
                     default: break;
                 }
             }
@@ -183,7 +220,12 @@ public class ControladorFacturacion {
                 if (Liquidacion.PENDIENTE.equals(l.getEstado())) {
                     r.porPagarConductores += l.getMonto();
                 }
-                r.margenPlataforma += l.getComisionPlataforma();
+                if (Liquidacion.PROGRAMADA.equals(l.getEstado())) {
+                    r.programadoConductores += l.getMonto();
+                }
+                if (Liquidacion.PENDIENTE.equals(l.getEstado()) || Liquidacion.PAGADA.equals(l.getEstado())) {
+                    r.margenPlataforma += l.getComisionPlataforma();
+                }
             }
         } catch (IOException e) {
             System.err.println("No se pudo calcular el resumen: " + e.getMessage());
@@ -193,6 +235,8 @@ public class ControladorFacturacion {
         r.pagadoConductores = Math.round(r.pagadoConductores * 100) / 100.0;
         r.porPagarConductores = Math.round(r.porPagarConductores * 100) / 100.0;
         r.margenPlataforma = Math.round(r.margenPlataforma * 100) / 100.0;
+        r.devoluciones = Math.round(r.devoluciones * 100) / 100.0;
+        r.programadoConductores = Math.round(r.programadoConductores * 100) / 100.0;
         return r;
     }
 }

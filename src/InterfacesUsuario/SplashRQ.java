@@ -158,7 +158,7 @@ public class SplashRQ extends JWindow {
         int x = 270;
         g.setColor(Color.WHITE);
         g.setFont(Tema.fuente(Font.BOLD, 54f));
-        g.drawString("RQ", x, 128);
+        g.drawString(objetosServicio.Marca.NOMBRE, x, 128);
         g.setColor(Tema.AMBAR);
         g.fillRoundRect(x, 140, 56, 5, 5, 5);
         g.setColor(new Color(0xCFE3F3));

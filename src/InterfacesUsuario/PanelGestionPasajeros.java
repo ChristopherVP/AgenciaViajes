@@ -82,7 +82,7 @@ public class PanelGestionPasajeros extends JPanel {
         panelSuperior.add(panelBotones, BorderLayout.WEST);
         panelSuperior.add(panelBusqueda, BorderLayout.EAST);
 
-        String[] cols = new String[]{"ID", "Nombre", "Cédula", "Edad", "Tipo", "Teléfono", "Email", "Empresa"};
+        String[] cols = new String[]{"ID", "Nombre", "Cédula", "Edad", "Tipo", "Teléfono", "Email"};
         this.modelo = new DefaultTableModel(cols, 0) {
             public boolean isCellEditable(int r, int c) {
                 return false;
@@ -119,7 +119,7 @@ public class PanelGestionPasajeros extends JPanel {
             }
 
             for(Pasajero p : this.listaPasajerosCompleta) {
-                if (this.empresaFiltro == null || p.getEmpresa() != null && p.getEmpresa().getIdEmpresa().equals(this.empresaFiltro.getIdEmpresa())) {
+                {
 
                     if (!texto.isEmpty()) {
                         boolean coincide = p.getNombre().toUpperCase().contains(texto) ||
@@ -136,7 +136,7 @@ public class PanelGestionPasajeros extends JPanel {
                         nombreEmpresa = (String)mapaEmpresas.getOrDefault(id, id);
                     }
 
-                    this.modelo.addRow(new Object[]{p.getIdPasajero(), p.getNombre(), p.getCedula(), p.calcularEdad() + " años", p.getTipoPasajero(), p.getTelefono(), p.getEmail(), nombreEmpresa});
+                    this.modelo.addRow(new Object[]{p.getIdPasajero(), p.getNombre(), p.getCedula(), p.calcularEdad() + " años", p.getTipoPasajero(), p.getTelefono(), p.getEmail()});
                 }
             }
         }

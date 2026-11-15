@@ -282,7 +282,7 @@ public class DialogoFormularioViaje extends JDialog {
         g.gridy = 11;
         p.add(new JLabel("Estado: *"), g);
         g.gridx = 1;
-        this.cmbEstado = new JComboBox<>(new String[]{"Programado", "En Curso", "Finalizado", "Cancelado"});
+        this.cmbEstado = new JComboBox<>(new String[]{"Por aceptar", "Programado", "En Curso", "Finalizado", "Completado", "Cancelado"});
         p.add(this.cmbEstado, g);
         g.gridx = 0;
         g.gridy = 12;

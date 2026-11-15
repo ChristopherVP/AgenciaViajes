@@ -40,9 +40,9 @@ public final class DatosIniciales {
     }
 
     private static final DatosEmpresa[] EMPRESAS = {
-            new DatosEmpresa("Flota Andina RQ", "1791234567001", "Av. Amazonas N24-15 y Colón, Quito", "022345678", "contacto@flotaandina.com"),
-            new DatosEmpresa("Costa Express RQ", "0991234567001", "Av. de las Américas 450, Guayaquil", "042567890", "info@costaexpress.com"),
-            new DatosEmpresa("Transportes Cumbre RQ", "0190123456001", "Calle Larga 6-45, Cuenca", "072841234", "reservas@transcumbre.com")
+            new DatosEmpresa("Flota Andina", "1791234567001", "Av. Amazonas N24-15 y Colón, Quito", "022345678", "contacto@flotaandina.com"),
+            new DatosEmpresa("Costa Express", "0991234567001", "Av. de las Américas 450, Guayaquil", "042567890", "info@costaexpress.com"),
+            new DatosEmpresa("Transportes Cumbre", "0190123456001", "Calle Larga 6-45, Cuenca", "072841234", "reservas@transcumbre.com")
     };
 
     private static final DatosRuta[][] RUTAS = {

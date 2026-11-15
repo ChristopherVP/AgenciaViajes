@@ -25,13 +25,14 @@ public class PanelBilletera extends JPanel {
     private final Runnable alCambiar;
     private final JLabel lblSaldo = new JLabel("$0.00");
     private final JLabel lblPendientes = Tema.etiqueta(" ");
-    private final DefaultTableModel modelo = new DefaultTableModel(new String[]{"Fecha", "Movimiento", "Método", "Monto", "Estado", "Detalle"}, 0) {
+    private final DefaultTableModel modelo = new DefaultTableModel(new String[]{"Código", "Fecha", "Movimiento", "Método", "Monto", "Estado", "Detalle"}, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
             return false;
         }
     };
     private final JTable tabla = new JTable(modelo);
+    private List<Movimiento> movimientos = new java.util.ArrayList<>();
 
     public PanelBilletera(Usuario usuario, Runnable alCambiar) {
         this.usuario = usuario;
@@ -76,7 +77,7 @@ public class PanelBilletera extends JPanel {
         add(tarjeta, BorderLayout.NORTH);
 
         Tema.tabla(tabla);
-        tabla.getColumnModel().getColumn(4).setCellRenderer(new DefaultTableCellRenderer() {
+        tabla.getColumnModel().getColumn(5).setCellRenderer(new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable tb, Object v, boolean sel, boolean foco, int fila, int col) {
                 Component c = super.getTableCellRendererComponent(tb, v, sel, foco, fila, col);
@@ -88,8 +89,17 @@ public class PanelBilletera extends JPanel {
         });
         JScrollPane scroll = new JScrollPane(tabla);
         scroll.getViewport().setBackground(Color.WHITE);
-        scroll.setBorder(BorderFactory.createTitledBorder("Historial de movimientos"));
-        add(scroll, BorderLayout.CENTER);
+        scroll.setBorder(BorderFactory.createTitledBorder("Historial de movimientos (lo más reciente arriba)"));
+        javax.swing.JButton pdf = Tema.boton("Descargar PDF del movimiento", false);
+        pdf.addActionListener(e -> descargarMovimiento());
+        JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        barra.setOpaque(false);
+        barra.add(pdf);
+        JPanel centro = new JPanel(new BorderLayout(0, 8));
+        centro.setOpaque(false);
+        centro.add(barra, BorderLayout.NORTH);
+        centro.add(scroll, BorderLayout.CENTER);
+        add(centro, BorderLayout.CENTER);
         JLabel nota = Tema.etiqueta("<html>Las recargas quedan <b>PENDIENTES</b> hasta que el administrador las apruebe. El saldo solo cambia con recargas aprobadas, compras y reembolsos.</html>");
         nota.setForeground(Tema.TEXTO_SUAVE);
         add(nota, BorderLayout.SOUTH);
@@ -106,11 +116,12 @@ public class PanelBilletera extends JPanel {
         if (h.isExito()) {
             @SuppressWarnings("unchecked")
             List<Movimiento> lista = (List<Movimiento>) h.getDatos();
+            movimientos = lista;
             for (Movimiento m : lista) {
                 String fecha = m.getFecha() == null ? "" : String.format("%02d/%02d/%04d %s", m.getFecha().getDia(), m.getFecha().getMes(), m.getFecha().getAnio(), m.getHora() == null ? "" : m.getHora().substring(0, Math.min(5, m.getHora().length())));
                 boolean egreso = Movimiento.COMPRA.equals(m.getTipo());
                 String detalle = Movimiento.RECHAZADA.equals(m.getEstado()) ? "Motivo: " + m.getMotivo() : (Movimiento.COMPRA.equals(m.getTipo()) ? "Reserva " + m.getReferencia() : m.getReferencia());
-                modelo.addRow(new Object[]{fecha, etiquetaTipo(m.getTipo()), m.getMetodo(), (egreso ? "-" : "+") + Tema.dinero(m.getMonto()), m.getEstado(), detalle});
+                modelo.addRow(new Object[]{m.getIdMovimiento(), fecha, etiquetaTipo(m.getTipo()), m.getMetodo(), (egreso ? "-" : "+") + Tema.dinero(m.getMonto()), m.getEstado(), detalle});
                 if (m.esRecargaPendiente()) {
                     pendientes++;
                     enEspera += m.getMonto();
@@ -118,6 +129,20 @@ public class PanelBilletera extends JPanel {
             }
         }
         lblPendientes.setText(pendientes > 0 ? pendientes + " recarga(s) en revisión por " + Tema.dinero(enEspera) : " ");
+    }
+
+    private void descargarMovimiento() {
+        int fila = tabla.getSelectedRow();
+        if (fila < 0) {
+            Tema.info(this, "Selecciona un movimiento del historial.");
+            return;
+        }
+        String id = String.valueOf(modelo.getValueAt(fila, 0));
+        Movimiento m = movimientos.stream().filter(x -> x.getIdMovimiento().equals(id)).findFirst().orElse(null);
+        if (m != null) {
+            Descargas.guardarPdf(this, "Descargar movimiento", control.ComprobantesPdf.nombreSugerido("Movimiento", id),
+                    destino -> new control.ComprobantesPdf().movimiento(destino, m));
+        }
     }
 
     private static String etiquetaTipo(String tipo) {

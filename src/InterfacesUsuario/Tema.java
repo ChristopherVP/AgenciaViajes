@@ -130,7 +130,7 @@ public final class Tema {
     }
 
     public static void info(Component padre, String mensaje) {
-        JOptionPane.showMessageDialog(padre, mensaje, "RQ", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(padre, mensaje, objetosServicio.Marca.NOMBRE, JOptionPane.INFORMATION_MESSAGE);
     }
 
     /** Botón redondeado que se pinta solo (los colores se ven igual en cualquier sistema). */

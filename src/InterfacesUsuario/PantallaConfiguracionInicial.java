@@ -31,11 +31,11 @@ public class PantallaConfiguracionInicial extends JFrame {
     private final JLabel lblMensaje = Tema.mensaje();
 
     public PantallaConfiguracionInicial() {
-        setTitle("RQ - Configuración inicial");
+        setTitle(objetosServicio.Marca.NOMBRE + " - Configuración inicial");
         setIconImage(IconoRQ.crear(64));
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
-        add(Tema.encabezado("Bienvenido a RQ", "Configuración inicial: crea la cuenta del administrador general"), BorderLayout.NORTH);
+        add(Tema.encabezado("Bienvenido a " + objetosServicio.Marca.NOMBRE, "Configuración inicial: crea la cuenta del administrador general"), BorderLayout.NORTH);
 
         JPanel formulario = Tema.panelFormulario();
         cmbPregunta.setEditable(true);

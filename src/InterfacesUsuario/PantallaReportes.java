@@ -128,7 +128,7 @@ public class PantallaReportes extends JDialog {
         int totalRutas = (new Rutas("rutas.dat")).lista().size();
         int totalViajes = (new Viajes("viajes.dat")).lista().size();
         int totalReservas = (new Reservas("reservas.dat")).lista().size();
-        int totalFacturas = (new Facturas("facturas.dat")).lista().size();
+        int totalFacturas = new control.ControladorFacturacion().resumen().facturas;
         int totalUsuarios = (new Usuarios("usuarios.dat")).lista().size();
         int totalEmpresas = (new Empresas("empresas.dat")).lista().size();
         if (this.empresaFiltro != null) {
@@ -137,7 +137,6 @@ public class PantallaReportes extends JDialog {
             totalRutas = (int)(new Rutas("rutas.dat")).lista().stream().filter((r) -> r.getEmpresa() != null && r.getEmpresa().getIdEmpresa().equals(id)).count();
             totalViajes = (int)(new Viajes("viajes.dat")).lista().stream().filter((v) -> v.getEmpresa() != null && v.getEmpresa().getIdEmpresa().equals(id)).count();
             totalReservas = (int)(new Reservas("reservas.dat")).lista().stream().filter((r) -> r.getEmpresa() != null && r.getEmpresa().getIdEmpresa().equals(id)).count();
-            totalFacturas = (int)(new Facturas("facturas.dat")).lista().stream().filter((f) -> f.getEmpresa() != null && f.getEmpresa().getIdEmpresa().equals(id)).count();
             totalUsuarios = (int)(new Usuarios("usuarios.dat")).lista().stream().filter((u) -> u.getEmpresa() != null && u.getEmpresa().getIdEmpresa().equals(id)).count();
             totalEmpresas = 1;
         }
@@ -223,38 +222,23 @@ public class PantallaReportes extends JDialog {
     }
 
     private void generarEstadisticasFacturas(StringBuilder resultado) throws PersistenciaException {
-        List<Factura> facturas = (new Facturas("facturas.dat")).lista();
-        int pagadas = 0;
-        int pendientes = 0;
-        int canceladas = 0;
-        double totalPagado = (double)0.0F;
-        double totalPendiente = (double)0.0F;
-
-        for(int i = 0; i < facturas.size(); ++i) {
-            Factura f = (Factura)facturas.get(i);
-            if (this.empresaFiltro == null || f.getEmpresa() != null && f.getEmpresa().getIdEmpresa().equals(this.empresaFiltro.getIdEmpresa())) {
-                String estado = f.getEstado();
-                if ("Pagada".equals(estado)) {
-                    ++pagadas;
-                    totalPagado += f.getTotal();
-                } else if ("Pendiente".equals(estado)) {
-                    ++pendientes;
-                    totalPendiente += f.getTotal();
-                } else if ("Cancelada".equals(estado)) {
-                    ++canceladas;
-                }
-            }
+        control.ControladorFacturacion cf = new control.ControladorFacturacion();
+        control.ControladorFacturacion.Resumen r = cf.resumen();
+        java.util.Map<String, int[]> porTipo = new java.util.TreeMap<>();
+        java.util.Map<String, Double> montoTipo = new java.util.TreeMap<>();
+        for (objetosNegocio.Comprobante c : cf.todasParaInformes()) {
+            String etiqueta = c.getTipoEtiqueta();
+            porTipo.computeIfAbsent(etiqueta, k -> new int[1])[0]++;
+            montoTipo.merge(etiqueta, c.getTotal(), Double::sum);
         }
-
-        int total = pagadas + pendientes + canceladas;
         resultado.append("ESTADÍSTICAS DE FACTURAS\n\n");
-        resultado.append(String.format("Total de facturas:     %d\n", total));
-        resultado.append(String.format("Pagadas:               %d\n", pagadas));
-        resultado.append(String.format("Pendientes:            %d\n", pendientes));
-        resultado.append(String.format("Canceladas:            %d\n", canceladas));
-        resultado.append(String.format("\nMonto pagado:          $%.2f\n", totalPagado));
-        resultado.append(String.format("Monto pendiente:       $%.2f\n", totalPendiente));
-        resultado.append(String.format("Monto total:           $%.2f\n", totalPagado + totalPendiente));
+        resultado.append(String.format("Total de facturas emitidas: %d\n\n", r.facturas));
+        for (java.util.Map.Entry<String, int[]> e : porTipo.entrySet()) {
+            resultado.append(String.format("%-34s %4d   $%,.2f\n", e.getKey(), e.getValue()[0], montoTipo.get(e.getKey())));
+        }
+        resultado.append(String.format("\nPagos a conductores ya realizados: $%,.2f\n", r.pagadoConductores));
+        resultado.append(String.format("Por pagar a conductores:           $%,.2f\n", r.porPagarConductores));
+        resultado.append(String.format("Programado (viajes por terminar):  $%,.2f\n", r.programadoConductores));
     }
 
     private void generarEstadisticasBuses(StringBuilder resultado) throws PersistenciaException {
@@ -403,29 +387,15 @@ public class PantallaReportes extends JDialog {
     }
 
     private void generarIngresosTotales(StringBuilder resultado) throws PersistenciaException {
-        List<Factura> facturas = (new Facturas("facturas.dat")).lista();
-        double totalPagado = (double)0.0F;
-        double totalPendiente = (double)0.0F;
-        double totalCancelado = (double)0.0F;
-
-        for(int i = 0; i < facturas.size(); ++i) {
-            Factura f = (Factura)facturas.get(i);
-            if (this.empresaFiltro == null || f.getEmpresa() != null && f.getEmpresa().getIdEmpresa().equals(this.empresaFiltro.getIdEmpresa())) {
-                if ("Pagada".equals(f.getEstado())) {
-                    totalPagado += f.getTotal();
-                } else if ("Pendiente".equals(f.getEstado())) {
-                    totalPendiente += f.getTotal();
-                } else if ("Cancelada".equals(f.getEstado())) {
-                    totalCancelado += f.getTotal();
-                }
-            }
-        }
-
+        control.ControladorFacturacion.Resumen r = new control.ControladorFacturacion().resumen();
         resultado.append("INGRESOS TOTALES\n\n");
-        resultado.append(String.format("Ingresos recibidos (pagadas):  $%,.2f\n", totalPagado));
-        resultado.append(String.format("Ingresos pendientes:           $%,.2f\n", totalPendiente));
-        resultado.append(String.format("Ingresos cancelados:           $%,.2f\n", totalCancelado));
+        resultado.append(String.format("Ventas de pasajes (ingreso):         $%,.2f\n", r.ventasPasajes));
+        resultado.append(String.format("Devoluciones por viajes cancelados:  $%,.2f\n", r.devoluciones));
+        resultado.append(String.format("INGRESO NETO POR PASAJES:            $%,.2f\n", r.ventasPasajes - r.devoluciones));
         resultado.append("\n");
-        resultado.append(String.format("TOTAL ESPERADO:                $%,.2f\n", totalPagado + totalPendiente));
+        resultado.append(String.format("Recargas de billetera acreditadas:   $%,.2f\n", r.recargasAcreditadas));
+        resultado.append(String.format("Pagado a conductores (80 %%):         $%,.2f\n", r.pagadoConductores));
+        resultado.append(String.format("Por pagar a conductores:             $%,.2f\n", r.porPagarConductores));
+        resultado.append(String.format("Margen de la plataforma (20 %%):      $%,.2f\n", r.margenPlataforma));
     }
 }

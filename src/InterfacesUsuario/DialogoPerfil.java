@@ -102,6 +102,10 @@ public class DialogoPerfil extends JDialog {
         contenido.add(pestanaClave(), "clave");
         contenido.add(pestanaSeguridad(), "seguridad");
         boolean pasajero = usuario.getRol() == Rol.PASAJERO;
+        boolean conFoto = pasajero || usuario.getRol() == Rol.CONDUCTOR;
+        if (conFoto) {
+            contenido.add(pestanaFoto(), "foto");
+        }
         if (pasajero) {
             contenido.add(pestanaNovedad(), "novedad");
             contenido.add(pestanaMisNovedades(), "mis");
@@ -115,6 +119,9 @@ public class DialogoPerfil extends JDialog {
         agregarBoton(izquierda, "Modificar mis datos", "datos");
         agregarBoton(izquierda, "Cambiar contraseña", "clave");
         agregarBoton(izquierda, "Pregunta de seguridad", "seguridad");
+        if (conFoto) {
+            agregarBoton(izquierda, "Foto de perfil", "foto");
+        }
         if (pasajero) {
             agregarBoton(izquierda, "Enviar novedad o queja", "novedad");
             agregarBoton(izquierda, "Mis novedades", "mis");
@@ -131,6 +138,63 @@ public class DialogoPerfil extends JDialog {
         setPreferredSize(new Dimension(940, 660));
         pack();
         setLocationRelativeTo(padre);
+    }
+
+    private final JLabel lblFoto = new JLabel("", javax.swing.SwingConstants.CENTER);
+    private final JLabel msjFoto = Tema.mensaje();
+
+    private JPanel pestanaFoto() {
+        JPanel p = new JPanel(new BorderLayout(0, 12));
+        p.setBackground(Tema.FONDO);
+        p.setBorder(BorderFactory.createEmptyBorder(24, 40, 24, 40));
+        lblFoto.setPreferredSize(new Dimension(256, 256));
+        lblFoto.setBorder(BorderFactory.createLineBorder(Tema.BORDE));
+        JButton subir = Tema.boton("Subir foto (PNG o JPG)", true);
+        subir.addActionListener(e -> subirFoto());
+        JButton quitar = Tema.boton("Quitar foto", false);
+        quitar.addActionListener(e -> {
+            ResultadoOperacion r = new control.ControladorFotos().quitar(usuario.getIdPerfil());
+            Tema.mostrarMensaje(msjFoto, r.getMensaje(), r.isExito());
+            mostrarFoto();
+            alActualizar.run();
+        });
+        JPanel botones = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 0));
+        botones.setOpaque(false);
+        botones.add(subir);
+        botones.add(quitar);
+        JPanel centro = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        centro.setOpaque(false);
+        centro.add(lblFoto);
+        JLabel nota = Tema.nota(560, "<html>Solo se aceptan imágenes <b>PNG o JPG</b> (máx. 8 MB). Se recorta en cuadrado automáticamente.</html>");
+        nota.setForeground(Tema.TEXTO_SUAVE);
+        JPanel sur = new JPanel(new BorderLayout(0, 8));
+        sur.setOpaque(false);
+        sur.add(msjFoto, BorderLayout.NORTH);
+        sur.add(botones, BorderLayout.CENTER);
+        p.add(nota, BorderLayout.NORTH);
+        p.add(centro, BorderLayout.CENTER);
+        p.add(sur, BorderLayout.SOUTH);
+        mostrarFoto();
+        return p;
+    }
+
+    private void mostrarFoto() {
+        java.awt.image.BufferedImage img = new control.ControladorFotos().cargar(usuario.getIdPerfil());
+        lblFoto.setIcon(img == null ? null : new javax.swing.ImageIcon(img));
+        lblFoto.setText(img == null ? "Sin foto" : "");
+    }
+
+    private void subirFoto() {
+        javax.swing.JFileChooser fc = new javax.swing.JFileChooser();
+        fc.setAcceptAllFileFilterUsed(false);
+        fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Imágenes PNG o JPG", "png", "jpg", "jpeg"));
+        if (fc.showOpenDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        ResultadoOperacion r = new control.ControladorFotos().guardar(usuario.getIdPerfil(), fc.getSelectedFile());
+        Tema.mostrarMensaje(msjFoto, r.getMensaje(), r.isExito());
+        mostrarFoto();
+        alActualizar.run();
     }
 
     private void agregarBoton(JPanel panel, String texto, String tarjeta) {

@@ -1,0 +1,7 @@
+NOT00001	CDN005	Viaje finalizado	Llegaste a destino en el viaje VIA017 (Cuenca → Guayaquil). Tu pago de $12,80 quedó pendiente: finanzas lo depositará en tu tarjeta.	2026-11-14 20:25:36	0	VIA017
+NOT00002	CDN001	Viaje finalizado	Llegaste a destino en el viaje VIA025 (Quito → Ambato). Tu pago de $32,40 quedó pendiente: finanzas lo depositará en tu tarjeta.	2026-11-14 20:25:37	0	VIA025
+NOT00003	CDN007	Viaje finalizado	Llegaste a destino en el viaje VIA026 (Quito → Loja). Tu pago de $88,00 quedó pendiente: finanzas lo depositará en tu tarjeta.	2026-11-14 20:25:37	1	VIA026
+NOT00004	CDN007	Nuevo viaje asignado	Te asignaron el viaje VIA028: Loja → Quito, sale el 15/11/2026 20:00 y llega el 16/11/2026 09:00. Entra a Mis viajes y acéptalo (necesitas tu tarjeta de cobro registrada).	2026-11-14 20:31:02	1	VIA028
+NOT00005	ADMIN	Viaje aceptado	Marjorie Sarango aceptó el viaje VIA028 (Loja → Quito). Ya está a la venta.	2026-11-14 20:34:16	0	VIA028
+NOT00006	CDN007	Pago recibido	Finanzas te pagó $88,00 por el viaje VIA026 (Banco Pichincha · VISA ••••1111).	2026-11-14 20:35:51	1	VIA026
+NOT00007	CDN005	Viaje finalizado	Llegaste a destino en el viaje VIA023 (Cuenca → Loja). Tu pago de $7,20 quedó pendiente: finanzas lo depositará en tu tarjeta.	2026-11-14 21:00:00	0	VIA023

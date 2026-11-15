@@ -1,0 +1,9 @@
+LIQ00001	VIA007	CDN001	Carlos Mendoza Paredes	Flota Andina	Quito → Loja	14/11/2026 08:30	0	0.0	1	0.0	PROGRAMADA	2026-11-14 20:25:35			Banco Pichincha · VISA ••••1111		14/11/2026 21:30
+LIQ00002	VIA008	CDN002	Luis Andrade Cevallos	Flota Andina	Quito → Riobamba	15/11/2026 13:00	0	0.0	1	0.0	PROGRAMADA	2026-11-14 20:25:35			Banco del Pacífico · MASTERCARD ••••4444		15/11/2026 16:30
+LIQ00003	VIA016	CDN004	Marco Zambrano Loor	Costa Express	Guayaquil → Machala	15/11/2026 16:30	0	0.0	1	0.0	PROGRAMADA	2026-11-14 20:25:36			Banco Pichincha · VISA ••••1111		15/11/2026 20:00
+LIQ00004	VIA017	CDN005	Pablo Ordóñez Cárdenas	Transportes Cumbre	Cuenca → Guayaquil	08/11/2026 13:00	2	16.0	1	12.8	PENDIENTE	2026-11-14 20:25:36			Banco del Pacífico · MASTERCARD ••••4444		08/11/2026 17:00
+LIQ00005	VIA023	CDN005	Pablo Ordóñez Cárdenas	Transportes Cumbre	Cuenca → Loja	14/11/2026 16:30	1	9.0	1	7.2	PENDIENTE	2026-11-14 21:00:00			Banco del Pacífico · MASTERCARD ••••4444		14/11/2026 21:00
+LIQ00006	VIA024	CDN006	Diego Calle Idrovo	Transportes Cumbre	Cuenca → Machala	15/11/2026 21:00	0	0.0	1	0.0	PROGRAMADA	2026-11-14 20:25:36			Produbanco · VISA ••••1881		16/11/2026 00:00
+LIQ00007	VIA025	CDN001	Carlos Mendoza Paredes	Flota Andina	Quito → Ambato	12/11/2026 06:00	11	40.5	1	32.4	PENDIENTE	2026-11-14 20:25:37			Banco Pichincha · VISA ••••1111		12/11/2026 08:30
+LIQ00008	VIA026	CDN007	Marjorie Sarango	Flota Andina	Quito → Loja	06/11/2026 13:00	6	110.0	1	88.0	PAGADA	2026-11-14 20:25:37	2026-11-14 20:35:51	admin2	Banco Pichincha · VISA ••••1111	001-001-000000030	07/11/2026 02:00
+LIQ00009	VIA028	CDN007	Marjorie Sarango	Flota Andina	Loja → Quito	15/11/2026 20:00	0	0.0	1	0.0	PROGRAMADA	2026-11-14 20:34:16			Banco Pichincha · VISA ••••1111		16/11/2026 09:00

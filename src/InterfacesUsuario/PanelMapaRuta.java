@@ -110,6 +110,16 @@ public class PanelMapaRuta extends JPanel {
             }
             g2.drawString(e.getKey(), p.x + 6, p.y + 4);
         }
+        dibujarSuperposicion(g2, coord);
         g2.setTransform(anterior);
+    }
+
+    /** Gancho para subclases: dibujar encima del mapa usando las coordenadas del mapa (ya con escala aplicada). */
+    protected void dibujarSuperposicion(Graphics2D g2, Map<String, Point> coord) {
+    }
+
+    /** Ciudades del trayecto actual, de origen a destino. */
+    protected List<String> getCamino() {
+        return camino;
     }
 }

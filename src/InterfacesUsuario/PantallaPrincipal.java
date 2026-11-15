@@ -110,13 +110,15 @@ public class PantallaPrincipal extends JFrame {
                 () -> new PanelNovedadesAdmin(usuarioActual), false, false));
         p.add(new Pestana("Recargas", "Recargas de billetera (el efectivo lo aprueba finanzas)", Modulo.RECARGAS, new Color(200, 240, 200),
                 () -> new PanelRecargasAdmin(usuarioActual), false, false));
+        p.add(new Pestana("Flota y despacho", "Dónde está cada conductor y asignación de viajes", Modulo.VIAJES, new Color(255, 235, 205),
+                () -> new PanelDespacho(usuarioActual), true, false));
         p.add(new Pestana("Pagos a conductores", "80 % de lo recaudado por cada viaje realizado", Modulo.PAGOS, new Color(255, 210, 170),
                 () -> new PanelPagosConductores(usuarioActual), false, false));
         return p;
     }
 
     private void initComponents() {
-        setTitle("RQ - Sistema de Transporte Interprovincial - " + usuarioActual.getNombre() + " (" + usuarioActual.getTipo() + ")");
+        setTitle(objetosServicio.Marca.NOMBRE + " - Agencia de Viajes en Bus - " + usuarioActual.getNombre() + " (" + usuarioActual.getTipo() + ")");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(1200, 700);
         setExtendedState(MAXIMIZED_BOTH);
@@ -163,12 +165,6 @@ public class PantallaPrincipal extends JFrame {
         }
 
         List<JButton> extras = new ArrayList<>();
-        JButton pdf = Tema.boton("Guardar en PDF", false);
-        pdf.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.PDF));
-        JButton excel = Tema.boton("Guardar en Excel", false);
-        excel.addActionListener(e -> exportarPestana(ExportadorTabla.Formato.EXCEL));
-        extras.add(pdf);
-        extras.add(excel);
         if (Permisos.puedeVer(usuarioActual, Modulo.REPORTES)) {
             JButton informes = Tema.boton("Informes PDF", false);
             informes.addActionListener(e -> abrirInformes());
@@ -243,10 +239,10 @@ public class PantallaPrincipal extends JFrame {
 
     private List<Pestana> definirPestanasSinFabricar() {
         List<Pestana> p = new ArrayList<>();
-        String[] titulos = {"Empresas", "Usuarios", "Conductores", "Pasajeros", "Buses", "Rutas", "Viajes", "Reservas", "Facturas", "Novedades", "Recargas", "Pagos a conductores"};
+        String[] titulos = {"Empresas", "Usuarios", "Conductores", "Pasajeros", "Buses", "Rutas", "Viajes", "Reservas", "Facturas", "Novedades", "Recargas", "Flota y despacho", "Pagos a conductores"};
         Color[] colores = {new Color(220, 220, 220), new Color(230, 230, 250), new Color(255, 215, 0), new Color(255, 228, 196), new Color(173, 216, 230),
                 new Color(152, 251, 152), new Color(255, 255, 224), new Color(255, 182, 193), new Color(224, 255, 255), new Color(255, 240, 200),
-                new Color(200, 240, 200), new Color(255, 210, 170)};
+                new Color(200, 240, 200), new Color(255, 235, 205), new Color(255, 210, 170)};
         for (int i = 0; i < titulos.length; i++) {
             p.add(new Pestana(titulos[i], "", Modulo.EMPRESAS, colores[i], null, false, false));
         }

@@ -50,7 +50,13 @@ public class PanelNovedadesAdmin extends JPanel {
         responder.addActionListener(e -> responder());
         actualizar.addActionListener(e -> recargar());
         cmbFiltro.addActionListener(e -> recargar());
+        javax.swing.JButton aprobar = Tema.boton("Aprobar cancelación de viaje", false);
+        aprobar.addActionListener(e -> decidirCancelacion(true));
+        javax.swing.JButton denegar = Tema.boton("Denegar cancelación", false);
+        denegar.addActionListener(e -> decidirCancelacion(false));
         arriba.add(responder);
+        arriba.add(aprobar);
+        arriba.add(denegar);
         arriba.add(actualizar);
         add(arriba, BorderLayout.NORTH);
 
@@ -141,6 +147,36 @@ public class PanelNovedadesAdmin extends JPanel {
         if (!r.isExito()) {
             Tema.error(this, r.getMensaje());
         }
+        recargar();
+    }
+
+    /** Solicitudes "No puedo realizar el viaje": aprobar cancela el viaje, reembolsa a los pasajeros y saca el pago de la lista. */
+    private void decidirCancelacion(boolean aprobar) {
+        Novedad n = novedadDeFila(tabla.getSelectedRow());
+        if (n == null) {
+            Tema.error(this, "Selecciona la solicitud del conductor.");
+            return;
+        }
+        if (!"NO_PUEDE_VIAJAR".equals(n.getTipo()) || n.getIdViaje() == null || n.getIdViaje().isEmpty()) {
+            Tema.error(this, "Esta novedad no es una solicitud de cancelar un viaje.");
+            return;
+        }
+        control.ControladorDespacho despacho = new control.ControladorDespacho();
+        ResultadoOperacion r;
+        if (aprobar) {
+            if (JOptionPane.showConfirmDialog(this, "Se cancelará el viaje " + n.getIdViaje() + ", se devolverá el dinero a los pasajeros y\nsaldrá de la lista de pagos al conductor. ¿Continuar?",
+                    "Aprobar cancelación", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                return;
+            }
+            r = despacho.aprobarCancelacion(actor, n.getIdNovedad());
+        } else {
+            String motivo = JOptionPane.showInputDialog(this, "Motivo para denegar (el conductor debe realizar el viaje):", "Denegar cancelación", JOptionPane.QUESTION_MESSAGE);
+            if (motivo == null) {
+                return;
+            }
+            r = despacho.denegarCancelacion(actor, n.getIdNovedad(), motivo);
+        }
+        if (r.isExito()) Tema.info(this, r.getMensaje()); else Tema.error(this, r.getMensaje());
         recargar();
     }
 }

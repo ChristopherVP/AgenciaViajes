@@ -47,12 +47,15 @@ public class PanelMisPasajes extends JPanel {
         verRuta.addActionListener(e -> verRuta());
         javax.swing.JButton verFactura = Tema.boton("Ver factura", true);
         verFactura.addActionListener(e -> verFactura());
+        javax.swing.JButton pdf = Tema.boton("Descargar pasaje PDF", false);
+        pdf.addActionListener(e -> descargarPasaje());
         javax.swing.JButton actualizar = Tema.boton("Actualizar", false);
         actualizar.addActionListener(e -> recargar());
         JPanel botones = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         botones.setOpaque(false);
         botones.add(actualizar);
         botones.add(verRuta);
+        botones.add(pdf);
         botones.add(verFactura);
         JLabel regla = Tema.etiqueta("Los pasajes comprados son definitivos: no se cancelan ni se devuelve el dinero.");
         regla.setForeground(Tema.TEXTO_SUAVE);
@@ -125,5 +128,13 @@ public class PanelMisPasajes extends JPanel {
             return;
         }
         new DialogoFactura(javax.swing.SwingUtilities.getWindowAncestor(this), c).setVisible(true);
+    }
+
+    private void descargarPasaje() {
+        Reserva r = seleccionada();
+        if (r != null) {
+            Descargas.guardarPdf(this, "Descargar pasaje", control.ComprobantesPdf.nombreSugerido("Pasaje", r.getIdReserva()),
+                    destino -> new control.ComprobantesPdf().pasaje(destino, r));
+        }
     }
 }

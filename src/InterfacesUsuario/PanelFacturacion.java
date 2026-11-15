@@ -32,15 +32,11 @@ public class PanelFacturacion extends JPanel {
     private final ControladorFacturacion controlador = new ControladorFacturacion();
     private final Usuario usuario;
     private final boolean administracion;
-    private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"N.º factura", "Fecha", "Tipo", "Titular", "Cédula", "Concepto", "Total", "Emitida por"}, 0) {
-        @Override
-        public boolean isCellEditable(int r, int c) {
-            return false;
-        }
-    };
-    private final JTable tabla = new JTable(modelo);
-    private final JComboBox<String> cmbTipo = new JComboBox<>(new String[]{"Todas las facturas", "Pasajes vendidos", "Recargas", "Pagos a conductores"});
+    private final DefaultTableModel modelo;
+    private final JTable tabla;
+    private final JComboBox<String> cmbTipo;
+    /** Tipo de comprobante de cada opción del filtro ("" = todos), según quién mira la pantalla. */
+    private final String[] tiposDelFiltro;
     private final JLabel lblEstado = Tema.mensaje();
     private final JPanel resumen = new JPanel(new GridLayout(1, 0, 10, 0));
     private List<Comprobante> actuales = new ArrayList<>();
@@ -48,6 +44,29 @@ public class PanelFacturacion extends JPanel {
     public PanelFacturacion(Usuario usuario, boolean administracion) {
         this.usuario = usuario;
         this.administracion = administracion;
+        // El titular y la cédula solo tienen sentido para la administración: un pasajero o conductor siempre ve SUS facturas.
+        String[] columnas = administracion
+                ? new String[]{"N.º factura", "Fecha", "Tipo", "Titular", "Cédula", "Concepto", "Total", "Emitida por"}
+                : new String[]{"N.º factura", "Fecha", "Tipo", "Concepto", "Total", "Emitida por"};
+        modelo = new DefaultTableModel(columnas, 0) {
+            @Override
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+        tabla = new JTable(modelo);
+        boolean esConductor = usuario != null && usuario.getRol() == objetosNegocio.Rol.CONDUCTOR;
+        if (administracion) {
+            tiposDelFiltro = new String[]{"", Comprobante.PASAJE, Comprobante.RECARGA, Comprobante.LIQUIDACION, Comprobante.REEMBOLSO};
+            cmbTipo = new JComboBox<>(new String[]{"Todas las facturas", "Pasajes vendidos", "Recargas", "Pagos a conductores", "Reembolsos"});
+        } else if (esConductor) {
+            tiposDelFiltro = new String[]{""};
+            cmbTipo = new JComboBox<>(new String[]{"Todas mis facturas"});
+        } else {
+            // el pasajero nunca paga a conductores: no existe ese tipo en su lista
+            tiposDelFiltro = new String[]{"", Comprobante.PASAJE, Comprobante.RECARGA, Comprobante.REEMBOLSO};
+            cmbTipo = new JComboBox<>(new String[]{"Todas mis facturas", "Pasajes comprados", "Recargas", "Reembolsos"});
+        }
         setLayout(new BorderLayout(0, 8));
         setBackground(Tema.FONDO);
         setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
@@ -64,6 +83,8 @@ public class PanelFacturacion extends JPanel {
         });
         JButton btnVer = Tema.boton("Ver factura", true);
         btnVer.addActionListener(e -> verFactura());
+        JButton btnPdf = Tema.boton("Descargar PDF", false);
+        btnPdf.addActionListener(e -> descargar());
         JButton btnActualizar = Tema.boton("Actualizar", false);
         btnActualizar.addActionListener(e -> cargar());
         cmbTipo.setFont(Tema.fuente(Font.PLAIN, 13f));
@@ -71,6 +92,7 @@ public class PanelFacturacion extends JPanel {
         JPanel barra = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 4));
         barra.setOpaque(false);
         barra.add(btnVer);
+        barra.add(btnPdf);
         barra.add(btnActualizar);
         barra.add(Tema.etiqueta("Mostrar:"));
         barra.add(cmbTipo);
@@ -103,12 +125,7 @@ public class PanelFacturacion extends JPanel {
             Tema.mostrarMensaje(lblEstado, r.getMensaje(), false);
             return;
         }
-        String filtro = switch (cmbTipo.getSelectedIndex()) {
-            case 1 -> Comprobante.PASAJE;
-            case 2 -> Comprobante.RECARGA;
-            case 3 -> Comprobante.LIQUIDACION;
-            default -> "";
-        };
+        String filtro = cmbTipo.getSelectedIndex() >= 0 && cmbTipo.getSelectedIndex() < tiposDelFiltro.length ? tiposDelFiltro[cmbTipo.getSelectedIndex()] : "";
         actuales = new ArrayList<>();
         double suma = 0;
         for (Comprobante c : (List<Comprobante>) r.getDatos()) {
@@ -117,8 +134,13 @@ public class PanelFacturacion extends JPanel {
             }
             actuales.add(c);
             suma += c.getTotal();
-            modelo.addRow(new Object[]{c.getNumero(), c.getFecha().format(FORMATO), c.getTipoEtiqueta(), c.getNombreTitular(), c.getCedulaTitular(),
-                    c.getConcepto(), String.format("$%.2f", c.getTotal()), c.getEmisor()});
+            if (administracion) {
+                modelo.addRow(new Object[]{c.getNumero(), c.getFecha().format(FORMATO), c.getTipoEtiqueta(), c.getNombreTitular(), c.getCedulaTitular(),
+                        c.getConcepto(), String.format("$%.2f", c.getTotal()), c.getEmisor()});
+            } else {
+                modelo.addRow(new Object[]{c.getNumero(), c.getFecha().format(FORMATO), c.getTipoEtiqueta(),
+                        c.getConcepto(), String.format("$%.2f", c.getTotal()), c.getEmisor()});
+            }
         }
         Tema.mostrarMensaje(lblEstado, actuales.size() + " factura(s) · total " + String.format("$%.2f", suma), true);
         if (administracion) {
@@ -129,6 +151,7 @@ public class PanelFacturacion extends JPanel {
             resumen.add(tarjeta("Pagado a conductores (80 %)", String.format("$%.2f", rs.pagadoConductores)));
             resumen.add(tarjeta("Por pagar a conductores", String.format("$%.2f", rs.porPagarConductores)));
             resumen.add(tarjeta("Margen plataforma (20 %)", String.format("$%.2f", rs.margenPlataforma)));
+            resumen.add(tarjeta("Devuelto a pasajeros", String.format("$%.2f", rs.devoluciones)));
             resumen.revalidate();
             resumen.repaint();
         }
@@ -146,6 +169,24 @@ public class PanelFacturacion extends JPanel {
         p.add(v, BorderLayout.CENTER);
         p.add(e, BorderLayout.SOUTH);
         return p;
+    }
+
+    private Comprobante seleccionada() {
+        int fila = tabla.getSelectedRow();
+        if (fila < 0) {
+            Tema.info(this, "Selecciona una factura de la lista.");
+            return null;
+        }
+        String numero = String.valueOf(modelo.getValueAt(fila, 0));
+        return actuales.stream().filter(c -> c.getNumero().equals(numero)).findFirst().orElse(null);
+    }
+
+    private void descargar() {
+        Comprobante c = seleccionada();
+        if (c != null) {
+            Descargas.guardarPdf(this, "Descargar factura", control.ComprobantesPdf.nombreSugerido("Factura", c.getNumero()),
+                    destino -> new control.ComprobantesPdf().factura(destino, c));
+        }
     }
 
     private void verFactura() {

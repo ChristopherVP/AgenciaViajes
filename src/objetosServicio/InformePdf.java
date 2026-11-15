@@ -212,7 +212,7 @@ public final class InformePdf {
         }
         texto(p, "F1", 14, MARGEN, ALTO - 190 - (linea - 1) * 38 - 30, subtitulo, 0.85f, 0.92f, 0.98f);
         texto(p, "F1", 11, MARGEN, ALTO - 400, "Fecha de emisión: " + fecha, 0.2f, 0.2f, 0.2f);
-        texto(p, "F1", 11, MARGEN, ALTO - 420, "Documento generado automáticamente por el sistema RQ.", 0.2f, 0.2f, 0.2f);
+        texto(p, "F1", 11, MARGEN, ALTO - 420, "Documento generado automáticamente por el sistema " + Marca.NOMBRE + ".", 0.2f, 0.2f, 0.2f);
         texto(p, "F1", 9, MARGEN, 70, "Información confidencial de uso interno. Los valores corresponden a los datos registrados hasta la fecha de emisión.", 0.4f, 0.4f, 0.4f);
         // índice
         p = paginas.get(1);
@@ -277,7 +277,7 @@ public final class InformePdf {
         rect(s, 0, ALTO - 120, ANCHO, 120, 0.04f, 0.18f, 0.29f);
         rect(s, MARGEN, ALTO - 124, 80, 4, 0.96f, 0.65f, 0.14f);
         texto(s, "F2", 22, MARGEN, ALTO - 60, "FACTURA", 1f, 1f, 1f);
-        texto(s, "F1", 11, MARGEN, ALTO - 82, "RQ · Sistema de Transporte Interprovincial", 0.85f, 0.92f, 0.98f);
+        texto(s, "F1", 11, MARGEN, ALTO - 82, Marca.SISTEMA, 0.85f, 0.92f, 0.98f);
         texto(s, "F2", 12, ANCHO - MARGEN - anchoMedido("N.º " + numero, 12), ALTO - 60, "N.º " + numero, 1f, 1f, 1f);
         texto(s, "F1", 10, ANCHO - MARGEN - anchoMedido(fecha, 10), ALTO - 80, fecha, 0.85f, 0.92f, 0.98f);
         float yy = ALTO - 160;
@@ -306,9 +306,133 @@ public final class InformePdf {
         rect(s, MARGEN + AREA - 190, yy - 52, 190, 40, 0.93f, 0.96f, 0.99f);
         texto(s, "F2", 10, MARGEN + AREA - 180, yy - 36, "TOTAL", 0.04f, 0.18f, 0.29f);
         texto(s, "F2", 16, MARGEN + AREA - 10 - anchoMedido(total, 16), yy - 38, total, 0.04f, 0.18f, 0.29f);
-        texto(s, "F1", 8.5f, MARGEN, 60, "Documento electrónico generado por el sistema RQ. Los pasajes comprados no admiten cancelación ni devolución.", 0.4f, 0.4f, 0.4f);
+        texto(s, "F1", 8.5f, MARGEN, 60, "Documento electrónico generado por el sistema " + Marca.NOMBRE + ". Los pasajes comprados no admiten cancelación ni devolución.", 0.4f, 0.4f, 0.4f);
         List<StringBuilder> paginas = new ArrayList<>();
         paginas.add(s);
+        ensamblar(paginas, destino);
+    }
+
+    /** Documento de una sola operación (factura, pasaje, movimiento de billetera, pago a conductor...) en bloques de datos. */
+    public static final class Documento {
+        private final String titulo;
+        private final String numero;
+        private final String fecha;
+        private String estado = "";
+        private String totalEtiqueta = "";
+        private String total = "";
+        private String pie = "";
+        private final List<String> titulos = new ArrayList<>();
+        private final List<List<String[]>> bloques = new ArrayList<>();
+
+        public Documento(String titulo, String numero, String fecha) {
+            this.titulo = titulo;
+            this.numero = numero;
+            this.fecha = fecha;
+        }
+
+        public Documento estado(String e) {
+            this.estado = e == null ? "" : e;
+            return this;
+        }
+
+        public Documento total(String etiqueta, String valor) {
+            this.totalEtiqueta = etiqueta;
+            this.total = valor;
+            return this;
+        }
+
+        public Documento pie(String p) {
+            this.pie = p == null ? "" : p;
+            return this;
+        }
+
+        /** Bloque con título y pares etiqueta/valor: {@code bloque("Viaje", "Ruta", "Quito → Riobamba", "Salida", "...")}. */
+        public Documento bloque(String tituloBloque, String... pares) {
+            List<String[]> filas = new ArrayList<>();
+            for (int i = 0; i + 1 < pares.length; i += 2) {
+                if (pares[i + 1] != null && !pares[i + 1].isBlank()) {
+                    filas.add(new String[]{pares[i], pares[i + 1]});
+                }
+            }
+            titulos.add(tituloBloque);
+            bloques.add(filas);
+            return this;
+        }
+    }
+
+    public static void guardarDocumento(File destino, Documento d) throws IOException {
+        List<StringBuilder> paginas = new ArrayList<>();
+        StringBuilder s = new StringBuilder();
+        paginas.add(s);
+        rect(s, 0, ALTO - 120, ANCHO, 120, 0.04f, 0.18f, 0.29f);
+        rect(s, MARGEN, ALTO - 124, 80, 4, 0.96f, 0.65f, 0.14f);
+        texto(s, "F2", 22, MARGEN, ALTO - 58, d.titulo.toUpperCase(Locale.ROOT), 1f, 1f, 1f);
+        texto(s, "F1", 11, MARGEN, ALTO - 82, Marca.SISTEMA, 0.85f, 0.92f, 0.98f);
+        String num = d.numero.isEmpty() ? "" : "N.º " + d.numero;
+        texto(s, "F2", 12, ANCHO - MARGEN - anchoMedido(num, 12), ALTO - 58, num, 1f, 1f, 1f);
+        texto(s, "F1", 10, ANCHO - MARGEN - anchoMedido(d.fecha, 10), ALTO - 78, d.fecha, 0.85f, 0.92f, 0.98f);
+        if (!d.estado.isEmpty()) {
+            float w = anchoMedido(d.estado, 9) + 18;
+            rect(s, ANCHO - MARGEN - w, ALTO - 106, w, 16, 0.96f, 0.65f, 0.14f);
+            texto(s, "F2", 9, ANCHO - MARGEN - w + 9, ALTO - 101, d.estado, 0.04f, 0.18f, 0.29f);
+        }
+        float yy = ALTO - 156;
+        for (int i = 0; i < d.bloques.size(); i++) {
+            List<String[]> filas = d.bloques.get(i);
+            if (filas.isEmpty()) {
+                continue;
+            }
+            if (yy < 150) {
+                s = new StringBuilder();
+                paginas.add(s);
+                yy = ALTO - 70;
+            }
+            rect(s, MARGEN, yy - 4, AREA, 18, 0.07f, 0.35f, 0.55f);
+            texto(s, "F2", 9.5f, MARGEN + 8, yy + 1, d.titulos.get(i).toUpperCase(Locale.ROOT), 1f, 1f, 1f);
+            yy -= 22;
+            boolean par = false;
+            for (String[] fila : filas) {
+                List<String> lineas = new ArrayList<>();
+                for (String parte : fila[1].split("\n")) {
+                    lineas.addAll(envolver(parte, AREA - 190, 10));
+                }
+                float alto = Math.max(1, lineas.size()) * 13 + 5;
+                if (yy - alto < 90) {
+                    s = new StringBuilder();
+                    paginas.add(s);
+                    yy = ALTO - 70;
+                }
+                if (par) {
+                    rect(s, MARGEN, yy - alto + 11, AREA, alto, 0.95f, 0.97f, 0.99f);
+                }
+                texto(s, "F2", 10, MARGEN + 8, yy, ajustar(fila[0], 150, 10), 0.3f, 0.35f, 0.4f);
+                float ly = yy;
+                for (String l : lineas) {
+                    texto(s, "F1", 10, MARGEN + 170, ly, l, 0.1f, 0.1f, 0.1f);
+                    ly -= 13;
+                }
+                yy -= alto;
+                par = !par;
+            }
+            yy -= 14;
+        }
+        if (!d.total.isEmpty()) {
+            if (yy < 120) {
+                s = new StringBuilder();
+                paginas.add(s);
+                yy = ALTO - 70;
+            }
+            linea(s, MARGEN, yy + 6, MARGEN + AREA);
+            rect(s, MARGEN + AREA - 230, yy - 44, 230, 44, 0.93f, 0.96f, 0.99f);
+            texto(s, "F2", 10, MARGEN + AREA - 220, yy - 20, d.totalEtiqueta.toUpperCase(Locale.ROOT), 0.04f, 0.18f, 0.29f);
+            texto(s, "F2", 18, MARGEN + AREA - 10 - anchoMedido(d.total, 18), yy - 30, d.total, 0.04f, 0.18f, 0.29f);
+        }
+        String pie = d.pie.isEmpty() ? "Documento electrónico generado por el sistema " + Marca.NOMBRE + "." : d.pie;
+        float py = 66;
+        for (String l : envolver(pie, AREA, 8.5f)) {
+            texto(s, "F1", 8.5f, MARGEN, py, l, 0.4f, 0.4f, 0.4f);
+            py -= 11;
+        }
         ensamblar(paginas, destino);
     }
 
@@ -349,7 +473,7 @@ public final class InformePdf {
             } else if (ch >= 32 && ch <= 255) {
                 sb.append(ch);
             } else if (ch == '–' || ch == '—' || ch == '→') {
-                sb.append(ch == '→' ? '>' : '-');
+                sb.append(ch == '→' ? "->" : "-");
             } else if (ch == '·' || ch == '•') {
                 sb.append('·');
             } else if (ch == '\n' || ch == '\r' || ch == '\t') {

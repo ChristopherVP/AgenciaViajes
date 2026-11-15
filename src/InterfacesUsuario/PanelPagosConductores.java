@@ -33,14 +33,14 @@ public class PanelPagosConductores extends JPanel {
     private final ControladorLiquidaciones controlador = new ControladorLiquidaciones();
     private final Usuario usuario;
     private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"ID", "Viaje", "Salida", "Ruta", "Conductor", "Pasajeros", "Recaudado", "Pago 80 %", "Estado", "Tarjeta de cobro", "Factura"}, 0) {
+            new String[]{"ID", "Viaje", "Salida", "Ruta", "Conductor", "Pasajeros", "Recaudado", "Pago 80 %", "Estado", "Llegada", "Tarjeta de cobro", "Factura"}, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
             return false;
         }
     };
     private final JTable tabla = new JTable(modelo);
-    private final JComboBox<String> cmbEstado = new JComboBox<>(new String[]{"Pendientes de pago", "Pagados", "Todos"});
+    private final JComboBox<String> cmbEstado = new JComboBox<>(new String[]{"Por pagar (pendientes)", "Pagados", "Programados (viaje aceptado)", "Todos"});
     private final JLabel lblEstado = Tema.mensaje();
     private List<Liquidacion> actuales = new ArrayList<>();
 
@@ -51,11 +51,17 @@ public class PanelPagosConductores extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
         Tema.tabla(tabla);
         tabla.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+        int[] anchos = {80, 70, 130, 170, 170, 80, 90, 90, 100, 130, 200, 150};
+        for (int i = 0; i < anchos.length && i < tabla.getColumnCount(); i++) {
+            tabla.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
+        }
         JButton btnPagar = Tema.boton("Pagar al conductor", true);
         btnPagar.setEnabled(Permisos.puedeEditar(usuario, Permisos.Modulo.PAGOS));
         btnPagar.addActionListener(e -> pagar());
         JButton btnFactura = Tema.boton("Ver factura del pago", false);
         btnFactura.addActionListener(e -> verFactura());
+        JButton btnPdf = Tema.boton("Descargar PDF", false);
+        btnPdf.addActionListener(e -> descargarPdf());
         JButton btnActualizar = Tema.boton("Actualizar", false);
         btnActualizar.addActionListener(e -> cargar());
         cmbEstado.setFont(Tema.fuente(Font.PLAIN, 13f));
@@ -64,11 +70,13 @@ public class PanelPagosConductores extends JPanel {
         barra.setOpaque(false);
         barra.add(btnPagar);
         barra.add(btnFactura);
+        barra.add(btnPdf);
         barra.add(btnActualizar);
         barra.add(Tema.etiqueta("Mostrar:"));
         barra.add(cmbEstado);
-        JLabel nota = Tema.nota(900, "<html>El conductor notifica que el viaje se realizó con éxito y aquí aparece su pago: el <b>80 %</b> de lo que pagaron los pasajeros "
-                + "(el 20 % es el margen de la plataforma). Solo finanzas puede pagar.</html>");
+        JLabel nota = Tema.nota(900, "<html>Cuando el conductor <b>acepta</b> un viaje aparece aquí como <b>PROGRAMADA</b> (aún no se paga). Al llegar el bus a destino "
+                + "pasa a <b>PENDIENTE</b> y recién entonces se puede pagar el <b>80 %</b> de lo recaudado (el 20 % es margen de la plataforma). "
+                + "Si el conductor cancela con aprobación del admin, sale de la lista.</html>");
         nota.setForeground(Tema.TEXTO_SUAVE);
         JPanel arriba = new JPanel(new BorderLayout());
         arriba.setOpaque(false);
@@ -90,19 +98,27 @@ public class PanelPagosConductores extends JPanel {
         }
         int filtro = cmbEstado.getSelectedIndex();
         actuales = new ArrayList<>();
-        double pendiente = 0, pagado = 0;
+        double pendiente = 0, pagado = 0, programado = 0;
         for (Liquidacion l : (List<Liquidacion>) r.getDatos()) {
-            boolean paga = Liquidacion.PAGADA.equals(l.getEstado());
-            if (paga) pagado += l.getMonto(); else pendiente += l.getMonto();
-            if ((filtro == 0 && paga) || (filtro == 1 && !paga)) {
+            String e = l.getEstado();
+            if (Liquidacion.CANCELADA.equals(e)) {
+                continue;
+            }
+            if (Liquidacion.PAGADA.equals(e)) pagado += l.getMonto();
+            else if (Liquidacion.PROGRAMADA.equals(e)) programado += l.getMonto();
+            else pendiente += l.getMonto();
+            boolean mostrar = filtro == 3 || (filtro == 0 && Liquidacion.PENDIENTE.equals(e))
+                    || (filtro == 1 && Liquidacion.PAGADA.equals(e)) || (filtro == 2 && Liquidacion.PROGRAMADA.equals(e));
+            if (!mostrar) {
                 continue;
             }
             actuales.add(l);
             modelo.addRow(new Object[]{l.getIdLiquidacion(), l.getIdViaje(), l.getFechaViaje(), l.getRuta(), l.getNombreConductor(), l.getPasajeros(),
-                    String.format("$%.2f", l.getRecaudado()), String.format("$%.2f", l.getMonto()), paga ? "PAGADA" : "PENDIENTE", l.getTarjeta(),
+                    String.format("$%.2f", l.getRecaudado()), String.format("$%.2f", l.getMonto()), e,
+                    l.getLlegadaViaje().isEmpty() ? "—" : l.getLlegadaViaje(), l.getTarjeta(),
                     l.getNumeroFactura().isEmpty() ? "—" : l.getNumeroFactura()});
         }
-        Tema.mostrarMensaje(lblEstado, String.format("Pendiente de pago: $%.2f · Ya pagado: $%.2f", pendiente, pagado), true);
+        Tema.mostrarMensaje(lblEstado, String.format("Por pagar: $%.2f · Programado (esperando llegada): $%.2f · Ya pagado: $%.2f", pendiente, programado, pagado), true);
     }
 
     private Liquidacion seleccionada() {
@@ -122,6 +138,10 @@ public class PanelPagosConductores extends JPanel {
         }
         if (Liquidacion.PAGADA.equals(l.getEstado())) {
             Tema.info(this, "Este pago ya fue realizado.");
+            return;
+        }
+        if (Liquidacion.PROGRAMADA.equals(l.getEstado())) {
+            Tema.info(this, "El viaje aún no termina. El pago se libera cuando el bus llegue a destino (" + l.getLlegadaViaje() + ").");
             return;
         }
         String mensaje = String.format("¿Pagar $%.2f a %s?\n\nViaje %s (%s)\nPasajeros: %d · Recaudado: $%.2f\nSe depositará en: %s",
@@ -149,5 +169,13 @@ public class PanelPagosConductores extends JPanel {
             return;
         }
         new DialogoFactura(javax.swing.SwingUtilities.getWindowAncestor(this), c).setVisible(true);
+    }
+
+    private void descargarPdf() {
+        Liquidacion l = seleccionada();
+        if (l != null) {
+            Descargas.guardarPdf(this, "Descargar pago", control.ComprobantesPdf.nombreSugerido("Pago", l.getIdLiquidacion()),
+                    destino -> new control.ComprobantesPdf().pagoConductor(destino, l));
+        }
     }
 }

@@ -112,7 +112,7 @@ public final class GeneradorInformes {
         String titulo = completo ? "Informe general del sistema" : permitidas.size() == 1 ? "Informe de " + permitidas.iterator().next().getEtiqueta().toLowerCase()
                 : "Informe del sistema";
         String sub = "Elaborado por " + actor.getNombre() + " · " + (actor.getCargo() == null || actor.getCargo().isEmpty() ? actor.getTipo() : actor.getCargo());
-        InformePdf pdf = new InformePdf(titulo, sub, "RQ · Sistema de Transporte Interprovincial");
+        InformePdf pdf = new InformePdf(titulo, sub, objetosServicio.Marca.SISTEMA);
         try {
             Datos d = new Datos(actor);
             for (Seccion s : Seccion.values()) {
@@ -393,7 +393,7 @@ public final class GeneradorInformes {
     }
 
     private static void resumen(InformePdf pdf, Datos d, Usuario actor) {
-        pdf.parrafo("Este informe resume el estado del sistema de transporte interprovincial RQ: la oferta (empresas, flota, rutas y viajes), la demanda "
+        pdf.parrafo("Este informe resume el estado del sistema de transporte interprovincial " + objetosServicio.Marca.NOMBRE + ": la oferta (empresas, flota, rutas y viajes), la demanda "
                 + "(pasajeros y reservas) y, según tu cargo, el movimiento de dinero.");
         pdf.indicadores(new String[]{"Empresas", "Buses", "Rutas", "Viajes"},
                 new String[]{String.valueOf(d.empresas.size()), String.valueOf(d.buses.size()), String.valueOf(d.rutas.size()), String.valueOf(d.viajes.size())});

@@ -25,7 +25,8 @@ import objetosServicio.Fecha;
  */
 public class ControladorCompras {
     public static final int MAX_ASIENTOS = 5;
-    private static final int MINUTOS_ANTES_DE_SALIDA = 30;
+    /** La venta se cierra este tiempo antes de la salida del bus (y por supuesto cuando ya salió). */
+    public static final int MINUTOS_ANTES_DE_SALIDA = 30;
 
     /** Viaje disponible para comprar, con los datos que necesita la pantalla. */
     public static class Oferta {
@@ -68,6 +69,50 @@ public class ControladorCompras {
         } catch (DateTimeException e) {
             return null;
         }
+    }
+
+    /** Hora prevista de llegada (fecha y hora de llegada del viaje); si falta, se calcula con la duración de la ruta. */
+    public static LocalDateTime llegadaDe(Viaje v) {
+        LocalDateTime salida = salidaDe(v);
+        if (salida == null) {
+            return null;
+        }
+        Fecha f = v.getFechaLlegada();
+        try {
+            if (f != null && v.getHoraLlegada() != null && v.getHoraLlegada().matches("\\d{1,2}:\\d{2}")) {
+                String h = v.getHoraLlegada().length() == 4 ? "0" + v.getHoraLlegada() : v.getHoraLlegada();
+                LocalDateTime llegada = LocalDateTime.of(LocalDate.of(f.getAnio(), f.getMes(), f.getDia()), LocalTime.parse(h));
+                if (llegada.isAfter(salida)) {
+                    return llegada;
+                }
+            }
+        } catch (DateTimeException e) {
+            // se usa la duración de la ruta
+        }
+        double horas = v.getRuta() != null && v.getRuta().getTiempoEstimado() > 0 ? v.getRuta().getTiempoEstimado() : 3;
+        return salida.plusMinutes(Math.round(horas * 60));
+    }
+
+    /** null si el viaje se puede comprar ahora; si no, el motivo en palabras para mostrarlo al pasajero. */
+    public static String motivoNoComprable(Viaje v) {
+        if (v == null) {
+            return "El viaje ya no existe";
+        }
+        String estado = v.getEstado() == null ? "" : v.getEstado().trim();
+        LocalDateTime salida = salidaDe(v);
+        if ("En Curso".equalsIgnoreCase(estado) || (salida != null && !salida.isAfter(LocalDateTime.now()))) {
+            return "El bus ya salió: la venta de este viaje está cerrada";
+        }
+        if (!"Programado".equalsIgnoreCase(estado)) {
+            return "Este viaje no está disponible (" + estado + ")";
+        }
+        if (salida == null || !salida.isAfter(LocalDateTime.now().plusMinutes(MINUTOS_ANTES_DE_SALIDA))) {
+            return "La venta se cerró " + MINUTOS_ANTES_DE_SALIDA + " minutos antes de la salida";
+        }
+        if (v.getAsientosDisponibles() <= 0) {
+            return "No quedan asientos disponibles";
+        }
+        return null;
     }
 
     public static boolean esComprable(Viaje v) {
@@ -138,7 +183,7 @@ public class ControladorCompras {
             double total = (Double) cotizacion.getDatos();
             Viaje viaje = fachada.obten(new Viaje(idViaje));
             if (!esComprable(viaje)) {
-                return new ResultadoOperacion(false, "Este viaje ya no está disponible para la compra");
+                return new ResultadoOperacion(false, motivoNoComprable(viaje));
             }
             ResultadoOperacion saldo = billetera.consultarSaldo(idPasajero);
             if (!saldo.isExito()) {
@@ -167,9 +212,18 @@ public class ControladorCompras {
                 return new ResultadoOperacion(false, "No se pudo confirmar la reserva: " + confirmada.getMensaje());
             }
             Reserva final_ = fachada.obten(new Reserva(reserva.getIdReserva()));
-            Comprobante factura = new ControladorFacturacion().emitirPasaje(final_ != null ? final_ : reserva);
+            Reserva paraFactura = final_ != null ? final_ : reserva;
+            if (paraFactura.getNumerosAsientos() == null || paraFactura.getNumerosAsientos().isEmpty()) {
+                List<String> numeros = new ArrayList<>();
+                for (Integer n : new ArrayList<>(asientos)) {
+                    numeros.add(String.valueOf(n));
+                }
+                numeros.sort(Comparator.comparingInt(Integer::parseInt));
+                paraFactura.setNumerosAsientos(numeros);
+            }
+            Comprobante factura = new ControladorFacturacion().emitirPasaje(paraFactura);
             return new ResultadoOperacion(true, String.format("¡Compra exitosa! Reserva %s por $%.2f%s", reserva.getIdReserva(), reserva.getPrecioTotal(),
-                    factura == null ? "" : ". Factura " + factura.getNumero()), final_ != null ? final_ : reserva);
+                    factura == null ? "" : ". Factura " + factura.getNumero()), paraFactura);
         } catch (FachadaException e) {
             return new ResultadoOperacion(false, "Error al comprar: " + e.getMessage());
         }
@@ -188,10 +242,20 @@ public class ControladorCompras {
     public ResultadoOperacion misPasajes(String idPasajero) {
         try {
             List<Reserva> lista = fachada.consultaReservasPorPasajero(idPasajero).stream()
-                    .sorted(Comparator.comparing(Reserva::getIdReserva).reversed()).collect(Collectors.toList());
+                    .sorted(Comparator.comparingLong((Reserva r) -> numeroDe(r.getIdReserva())).reversed()).collect(Collectors.toList());
             return new ResultadoOperacion(true, "OK", lista);
         } catch (FachadaException e) {
             return new ResultadoOperacion(false, e.getMessage());
+        }
+    }
+
+    /** Parte numérica de un id (RES012 -> 12) para ordenar del más reciente al más antiguo sin depender de los ceros. */
+    public static long numeroDe(String id) {
+        String digitos = id == null ? "" : id.replaceAll("\\D", "");
+        try {
+            return digitos.isEmpty() ? 0 : Long.parseLong(digitos);
+        } catch (NumberFormatException e) {
+            return 0;
         }
     }
 

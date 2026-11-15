@@ -56,7 +56,7 @@ public class ControladorViajes {
                             if (sinAsignacion != null) {
                                 return new ResultadoOperacion(false, sinAsignacion);
                             }
-                            ResultadoOperacion disponibilidad = this.verificarDisponibilidadBus(idBus, fechaSalida, fechaLlegada);
+                            ResultadoOperacion disponibilidad = this.verificarDisponibilidadBus(idBus, fechaSalida, fechaLlegada, horaSalida, horaLlegada, idViaje);
                             if (!disponibilidad.isExito()) {
                                 return disponibilidad;
                             } else {
@@ -147,22 +147,35 @@ public class ControladorViajes {
         }
     }
 
+    /**
+     * Cancela el viaje: los pasajes pagados se devuelven a la billetera de cada pasajero (con su nota de crédito), el pago del
+     * conductor sale de la lista y el viaje queda Cancelado.
+     */
     public ResultadoOperacion cancelarViaje(String idViaje, String motivo) {
         try {
             Viaje viaje = this.fachada.obten(new Viaje(idViaje));
             if (viaje == null) {
                 return new ResultadoOperacion(false, "El viaje no existe");
-            } else if ("Completado".equals(viaje.getEstado())) {
-                return new ResultadoOperacion(false, "No se puede cancelar un viaje completado");
+            } else if ("Completado".equals(viaje.getEstado()) || "Finalizado".equals(viaje.getEstado())) {
+                return new ResultadoOperacion(false, "No se puede cancelar un viaje que ya terminó");
             } else if ("Cancelado".equals(viaje.getEstado())) {
                 return new ResultadoOperacion(false, "El viaje ya está cancelado");
             } else {
-                List<Reserva> reservas = this.fachada.consultaReservasPorViaje(idViaje);
+                String razon = motivo == null || motivo.isBlank() ? "Viaje cancelado por la agencia" : motivo.trim();
+                ControladorBilletera billetera = new ControladorBilletera();
+                ControladorFacturacion facturacion = new ControladorFacturacion();
+                ControladorNotificaciones avisos = new ControladorNotificaciones();
                 int reservasCanceladas = 0;
-
-                for(Reserva reserva : reservas) {
-                    if ("Confirmada".equals(reserva.getEstado())) {
-                        reserva.setEstado("Cancelada");
+                double devuelto = 0;
+                for(Reserva reserva : this.fachada.consultaReservasPorViaje(idViaje)) {
+                    String e = reserva.getEstado() == null ? "" : reserva.getEstado();
+                    if (e.equalsIgnoreCase("CONFIRMADA") || e.equalsIgnoreCase("PENDIENTE_PAGO")) {
+                        ResultadoOperacion r = billetera.reembolsarReserva(reserva.getIdReserva());
+                        if (r.isExito() && r.getDatos() instanceof objetosNegocio.Movimiento mov) {
+                            facturacion.emitirReembolso(mov, razon);
+                            devuelto += mov.getMonto();
+                        }
+                        reserva.setEstado("CANCELADA");
                         this.fachada.actualiza(reserva);
                         ++reservasCanceladas;
                     }
@@ -170,7 +183,8 @@ public class ControladorViajes {
 
                 viaje.setEstado("Cancelado");
                 this.fachada.actualiza(viaje);
-                String mensaje = String.format("Viaje cancelado. Se cancelaron %d reserva(s)", reservasCanceladas);
+                new ControladorLiquidaciones().cancelarDeViaje(idViaje);
+                String mensaje = String.format("Viaje cancelado. Se cancelaron %d reserva(s) y se devolvieron $%.2f a las billeteras.", reservasCanceladas, devuelto);
                 return new ResultadoOperacion(true, mensaje, viaje);
             }
         } catch (FachadaException e) {
@@ -320,7 +334,7 @@ public class ControladorViajes {
                     } else if (!this.validarOrdenFechas(fechaSalida, fechaLlegada)) {
                         return new ResultadoOperacion(false, "La fecha de llegada debe ser posterior o igual a la fecha de salida");
                     } else if (estado != null && !estado.trim().isEmpty()) {
-                        return !estado.equalsIgnoreCase("Programado") && !estado.equalsIgnoreCase("En Curso") && !estado.equalsIgnoreCase("Finalizado") && !estado.equalsIgnoreCase("Cancelado") && !estado.equalsIgnoreCase("Completado") ? new ResultadoOperacion(false, "Estado inválido. Debe ser: Programado, En Curso, Finalizado o Cancelado") : new ResultadoOperacion(true, "Validación exitosa");
+                        return !estado.equalsIgnoreCase("Programado") && !estado.equalsIgnoreCase("Por aceptar") && !estado.equalsIgnoreCase("En Curso") && !estado.equalsIgnoreCase("Finalizado") && !estado.equalsIgnoreCase("Cancelado") && !estado.equalsIgnoreCase("Completado") ? new ResultadoOperacion(false, "Estado inválido. Debe ser: Por aceptar, Programado, En Curso, Finalizado o Cancelado") : new ResultadoOperacion(true, "Validación exitosa");
                     } else {
                         return new ResultadoOperacion(false, "El estado es obligatorio");
                     }
@@ -335,11 +349,32 @@ public class ControladorViajes {
         }
     }
 
-    private ResultadoOperacion verificarDisponibilidadBus(String idBus, Fecha fechaSalida, Fecha fechaLlegada) {
+    private static java.time.LocalDateTime instante(Fecha f, String hora, boolean fin) {
         try {
+            java.time.LocalTime t = hora != null && hora.trim().matches("\\d{1,2}:\\d{2}") ? java.time.LocalTime.parse(hora.trim().length() == 4 ? "0" + hora.trim() : hora.trim()) : (fin ? java.time.LocalTime.of(23, 59) : java.time.LocalTime.MIDNIGHT);
+            return java.time.LocalDateTime.of(f.getAnio(), f.getMes(), f.getDia(), t.getHour(), t.getMinute());
+        } catch (java.time.DateTimeException e) {
+            return null;
+        }
+    }
+
+    /** El bus no puede estar en dos viajes a la vez: se comparan fecha Y hora, con un descanso entre uno y otro. */
+    private ResultadoOperacion verificarDisponibilidadBus(String idBus, Fecha fechaSalida, Fecha fechaLlegada, String horaSalida, String horaLlegada, String idViajeNuevo) {
+        try {
+            java.time.LocalDateTime ini = instante(fechaSalida, horaSalida, false);
+            java.time.LocalDateTime fin = instante(fechaLlegada, horaLlegada, true);
+            int descanso = ControladorSimulacion.MINUTOS_DESCANSO;
             for(Viaje viaje : this.fachada.consultaViajes()) {
-                if (viaje.getBus() != null && viaje.getBus().getIdBus().equals(idBus) && !"Cancelado".equals(viaje.getEstado()) && !"Completado".equals(viaje.getEstado()) && this.hayConflictoFechas(fechaSalida, fechaLlegada, viaje.getFechaSalida(), viaje.getFechaLlegada())) {
-                    return new ResultadoOperacion(false, "El bus no está disponible en ese período. Conflicto con viaje: " + viaje.getIdViaje());
+                if (viaje.getBus() == null || !viaje.getBus().getIdBus().equals(idBus) || "Cancelado".equals(viaje.getEstado()) || viaje.getIdViaje().equals(idViajeNuevo)) {
+                    continue;
+                }
+                java.time.LocalDateTime oIni = ControladorCompras.salidaDe(viaje);
+                java.time.LocalDateTime oFin = ControladorCompras.llegadaDe(viaje);
+                boolean choca = ini != null && fin != null && oIni != null && oFin != null
+                        ? ini.isBefore(oFin.plusMinutes(descanso)) && fin.plusMinutes(descanso).isAfter(oIni)
+                        : this.hayConflictoFechas(fechaSalida, fechaLlegada, viaje.getFechaSalida(), viaje.getFechaLlegada());
+                if (choca) {
+                    return new ResultadoOperacion(false, "El bus no está disponible en ese horario (necesita " + descanso + " min de descanso). Conflicto con el viaje " + viaje.getIdViaje());
                 }
             }
 

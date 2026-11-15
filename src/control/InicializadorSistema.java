@@ -67,6 +67,12 @@ public final class InicializadorSistema {
         } catch (PersistenciaException e) {
             resumen.advertencias.add("Datos iniciales: " + e.getMessage());
         }
+        notificar(progreso, 85, "Cargando pasajeros, facturas y pagos de ejemplo...");
+        try {
+            DatosDemostracion.sembrarSiHaceFalta();
+        } catch (RuntimeException e) {
+            resumen.advertencias.add("Datos de demostración: " + e.getMessage());
+        }
         notificar(progreso, 100, "Todo listo");
         return resumen;
     }
