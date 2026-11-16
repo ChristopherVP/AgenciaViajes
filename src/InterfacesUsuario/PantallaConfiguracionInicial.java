@@ -33,7 +33,7 @@ public class PantallaConfiguracionInicial extends JFrame {
     public PantallaConfiguracionInicial() {
         setTitle(objetosServicio.Marca.NOMBRE + " - Configuración inicial");
         setIconImage(IconoApp.crear(64));
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        Navegador.confirmarAlSalir(this);
         setLayout(new BorderLayout());
         add(Tema.encabezado("Bienvenido a " + objetosServicio.Marca.NOMBRE, "Configuración inicial: crea la cuenta del administrador general"), BorderLayout.NORTH);
 

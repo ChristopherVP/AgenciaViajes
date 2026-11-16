@@ -33,7 +33,7 @@ public class PantallaInicioSesion extends JFrame {
     public PantallaInicioSesion() {
         setTitle(objetosServicio.Marca.NOMBRE + " - Iniciar sesión");
         setIconImage(IconoApp.crear(64));
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        Navegador.confirmarAlSalir(this);
         // pantalla completa: marca a la izquierda y formulario centrado a la derecha
         JPanel raiz = new JPanel(new java.awt.GridLayout(1, 2));
         raiz.add(crearPanelMarca());

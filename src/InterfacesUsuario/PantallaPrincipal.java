@@ -119,7 +119,7 @@ public class PantallaPrincipal extends JFrame {
 
     private void initComponents() {
         setTitle(objetosServicio.Marca.NOMBRE + " - Agencia de Viajes en Bus - " + usuarioActual.getNombre() + " (" + usuarioActual.getTipo() + ")");
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        Navegador.confirmarAlSalir(this);
         setSize(1200, 700);
         setExtendedState(MAXIMIZED_BOTH);
         setLocationRelativeTo(null);
@@ -269,6 +269,10 @@ public class PantallaPrincipal extends JFrame {
             JMenuItem informes = new JMenuItem("Informes formales en PDF...");
             informes.addActionListener(e -> abrirInformes());
             reportes.add(informes);
+            JMenuItem porPeriodo = new JMenuItem("Informe de viajes por periodo (PDF / Excel)...");
+            porPeriodo.addActionListener(e -> new DialogoInformeViajes(this, usuarioActual).setVisible(true));
+            porPeriodo.setEnabled(Permisos.puedeVer(usuarioActual, Modulo.VIAJES));
+            reportes.add(porPeriodo);
             reportes.addSeparator();
         }
         JMenuItem pdf = new JMenuItem("Guardar la pestaña actual en PDF");

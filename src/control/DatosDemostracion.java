@@ -32,7 +32,11 @@ import persistencia.Pasajeros;
 import persistencia.Rutas;
 
 /**
- * Datos de demostración: pasajeros (sin cuenta de acceso) con recargas, compras, facturas, novedades, reembolsos y pagos a
+ * Datos de demostración. Lo que se usa al iniciar el sistema es solo {@link #sembrarPasajerosIniciales()}: tarjeta de cobro de cada
+ * conductor y 24 pasajeros de ejemplo con una recarga en su billetera. El resto (historial de viajes pasados, ventas, pagos)
+ * ya no se carga porque chocaba con la regla de continuidad de los conductores.
+ *
+ * Datos de demostración completos: pasajeros (sin cuenta de acceso) con recargas, compras, facturas, novedades, reembolsos y pagos a
  * conductores programados, pendientes y pagados. Se cargan UNA sola vez (archivo marcador) y nunca borran nada existente.
  * Todo pertenece a las empresas existentes, así que los administradores por rol lo ven según su cargo.
  */
@@ -101,6 +105,28 @@ public final class DatosDemostracion {
             System.err.println("No se pudo cerrar la carga de demostración: " + e.getMessage());
         }
         return creados[0];
+    }
+
+    /**
+     * Tarjeta de cobro para cada conductor activo, 24 pasajeros de ejemplo (sin cuenta de acceso) y una recarga aprobada, con su
+     * comprobante, para cada pasajero nuevo. No repite lo que ya existe: los pasajeros se reconocen por su cédula.
+     */
+    public static int sembrarPasajerosIniciales() throws PersistenciaException, IOException {
+        registrarTarjetasDeCobro();
+        java.util.Set<String> antes = new java.util.HashSet<>();
+        for (Pasajero p : new Pasajeros("pasajeros.dat").lista()) {
+            antes.add(p.getIdPasajero());
+        }
+        int nuevos = 0;
+        int i = 0;
+        for (Pasajero p : crearPasajeros()) {
+            if (!antes.contains(p.getIdPasajero())) {
+                recargar(p, 20 + (i % 5) * 10, LocalDateTime.now().minusHours(3 + i));
+                nuevos++;
+            }
+            i++;
+        }
+        return nuevos;
     }
 
     @FunctionalInterface

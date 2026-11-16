@@ -84,7 +84,7 @@ public class SplashScreen extends JWindow {
             @Override
             protected Void doInBackground() {
                 try {
-                    InicializadorSistema.preparar((p, m) -> publish(new Object[]{p, m}));
+                    advertencias = InicializadorSistema.preparar((p, m) -> publish(new Object[]{p, m})).advertencias;
                 } catch (Throwable t) {
                     fallo = t;
                     return null;
@@ -122,9 +122,15 @@ public class SplashScreen extends JWindow {
         }.execute();
     }
 
+    private volatile java.util.List<String> advertencias = java.util.List.of();
+
     private void terminar() {
         animacion.stop();
         dispose();
+        if (!advertencias.isEmpty()) {
+            System.err.println("Avisos al iniciar: " + advertencias);
+            JOptionPane.showMessageDialog(null, "El sistema inició, pero hubo avisos:\n- " + String.join("\n- ", advertencias), "Avisos al iniciar", JOptionPane.WARNING_MESSAGE);
+        }
         if (fallo != null) {
             JOptionPane.showMessageDialog(null, "No se pudieron preparar los datos del sistema:\n" + fallo, "Error al iniciar", JOptionPane.ERROR_MESSAGE);
             System.exit(1);

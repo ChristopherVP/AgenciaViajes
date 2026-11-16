@@ -42,7 +42,6 @@ import persistencia.Viajes;
 public class PantallaReportes extends JDialog {
     private JList<String> listaReportes;
     private JTextArea areaResultados;
-    private JButton btnLimpiar;
     private JButton btnCerrar;
     private Empresa empresaFiltro;
 
@@ -76,11 +75,8 @@ public class PantallaReportes extends JDialog {
         JScrollPane scrollResultados = new JScrollPane(this.areaResultados);
         scrollResultados.setBorder(BorderFactory.createTitledBorder("Resultados"));
         JPanel panelBotones = new JPanel(new FlowLayout(1));
-        this.btnLimpiar = new JButton("Limpiar");
         this.btnCerrar = new JButton("Cerrar");
-        this.btnLimpiar.addActionListener((e) -> this.areaResultados.setText(""));
         this.btnCerrar.addActionListener((e) -> this.dispose());
-        panelBotones.add(this.btnLimpiar);
         panelBotones.add(this.btnCerrar);
         panelPrincipal.add(scrollLista, "West");
         panelPrincipal.add(scrollResultados, "Center");

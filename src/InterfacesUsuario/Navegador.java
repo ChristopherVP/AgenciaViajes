@@ -13,6 +13,26 @@ public final class Navegador {
     private Navegador() {
     }
 
+    /**
+     * Pide confirmación cuando alguien cierra la ventana con la X. Si responde que sí, el programa termina;
+     * si no, la ventana sigue abierta. (Cerrar sesión no pasa por aquí.)
+     */
+    public static void confirmarAlSalir(JFrame ventana) {
+        ventana.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        ventana.addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                Object[] opciones = {"Sí, salir", "No, volver"};
+                int r = JOptionPane.showOptionDialog(ventana, "¿Seguro que deseas salir del sistema?", "Salir",
+                        JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE, null, opciones, opciones[1]);
+                if (r == 0) {
+                    DB.ConexionOracle.cerrarTodo();
+                    System.exit(0);
+                }
+            }
+        });
+    }
+
     /** El administrador principal ya lo crea el sistema al arrancar (InicializadorSistema), así que siempre se empieza en el login. */
     public static void iniciar() {
         new PantallaInicioSesion().setVisible(true);

@@ -31,7 +31,7 @@ public class PantallaPortalPasajero extends JFrame {
         this.usuario = usuario;
         setTitle(objetosServicio.Marca.NOMBRE + " - Pasajero: " + usuario.getNombre());
         setIconImage(IconoApp.crear(64));
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        Navegador.confirmarAlSalir(this);
         setLayout(new BorderLayout());
         lblSaldo.setForeground(new Color(0x0B6B2E));
         lblSaldo.setFont(Tema.fuente(Font.BOLD, 16f));

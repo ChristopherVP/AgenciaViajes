@@ -17,6 +17,7 @@ import java.util.List;
  */
 public final class InicializadorSistema {
     private static final String CLAVE_DATOS_INICIALES = "DATOS_INICIALES";
+    private static final String CLAVE_PASAJEROS_INICIALES = "PASAJEROS_INICIALES";
 
     public interface Progreso {
         void avance(int porcentaje, String mensaje);
@@ -57,17 +58,30 @@ public final class InicializadorSistema {
         } catch (PersistenciaException e) {
             resumen.advertencias.add("Datos iniciales: " + e.getMessage());
         }
+        try {
+            if (!marcaPuesta(CLAVE_PASAJEROS_INICIALES)) {
+                notificar(progreso, 85, "Cargando pasajeros iniciales (solo la primera vez)...");
+                DatosDemostracion.sembrarPasajerosIniciales();
+                Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_PASAJEROS_INICIALES, "1");
+            }
+        } catch (PersistenciaException | java.io.IOException e) {
+            resumen.advertencias.add("Pasajeros iniciales: " + e.getMessage());
+        }
         notificar(progreso, 100, "Todo listo");
         return resumen;
     }
 
     private static boolean datosInicialesYaCargados() throws PersistenciaException {
-        return Bd.uno("SELECT VALOR FROM CONFIGURACION WHERE CLAVE = ?", rs -> rs.getString(1), CLAVE_DATOS_INICIALES) != null;
+        return marcaPuesta(CLAVE_DATOS_INICIALES);
+    }
+
+    private static boolean marcaPuesta(String clave) throws PersistenciaException {
+        return Bd.uno("SELECT VALOR FROM CONFIGURACION WHERE CLAVE = ?", rs -> rs.getString(1), clave) != null;
     }
 
     /** Quita la marca de "datos iniciales cargados" (la usa la herramienta de restablecimiento antes de volver a sembrar). */
     public static void olvidarDatosIniciales() throws PersistenciaException {
-        Bd.actualizar("DELETE FROM CONFIGURACION WHERE CLAVE = ?", CLAVE_DATOS_INICIALES);
+        Bd.actualizar("DELETE FROM CONFIGURACION WHERE CLAVE IN (?, ?)", CLAVE_DATOS_INICIALES, CLAVE_PASAJEROS_INICIALES);
     }
 
     /** Siembra los datos iniciales y deja la marca (la usa la herramienta de restablecimiento). */
@@ -75,6 +89,14 @@ public final class InicializadorSistema {
         int viajes = DatosIniciales.sembrarSiHaceFalta();
         if (!datosInicialesYaCargados()) {
             Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_DATOS_INICIALES, "1");
+        }
+        try {
+            if (!marcaPuesta(CLAVE_PASAJEROS_INICIALES)) {
+                DatosDemostracion.sembrarPasajerosIniciales();
+                Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_PASAJEROS_INICIALES, "1");
+            }
+        } catch (java.io.IOException e) {
+            throw new PersistenciaException("No se pudieron cargar los pasajeros iniciales: " + e.getMessage(), e);
         }
         return viajes;
     }

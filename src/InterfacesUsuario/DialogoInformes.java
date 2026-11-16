@@ -3,6 +3,7 @@ package InterfacesUsuario;
 import control.GeneradorInformes;
 import control.GeneradorInformes.Seccion;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Desktop;
 import java.awt.Dialog;
 import java.awt.Dimension;
@@ -110,19 +111,30 @@ public class DialogoInformes extends JDialog {
         botones.add(limpiar);
         botones.add(marcadas);
         botones.add(todo);
-        botones.add(porPeriodo);
         botones.add(cerrar);
         JLabel nota = Tema.nota(620, "<html>Cada informe incluye portada, índice, resumen con gráficos y las tablas con los datos. "
                 + "El <b>informe completo</b> reúne todas las secciones que tu cargo puede ver.</html>");
         nota.setForeground(Tema.TEXTO_SUAVE);
         nota.setBorder(BorderFactory.createEmptyBorder(8, 22, 0, 22));
+        JPanel destacado = new JPanel(new BorderLayout(12, 0));
+        destacado.setBackground(Color.WHITE);
+        destacado.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(8, 18, 4, 18),
+                BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Tema.BORDE), BorderFactory.createEmptyBorder(10, 14, 10, 14))));
+        JLabel textoPeriodo = new JLabel("<html><b>Informe de viajes por periodo</b><br>Quincenal, mensual o anual, en PDF o Excel.</html>");
+        textoPeriodo.setFont(Tema.fuente(Font.PLAIN, 13f));
+        destacado.add(textoPeriodo, BorderLayout.CENTER);
+        destacado.add(porPeriodo, BorderLayout.EAST);
+        JPanel arriba = new JPanel(new BorderLayout());
+        arriba.setBackground(Tema.FONDO);
+        arriba.add(destacado, BorderLayout.NORTH);
+        arriba.add(nota, BorderLayout.SOUTH);
         JPanel centro = new JPanel(new BorderLayout());
         centro.setBackground(Tema.FONDO);
-        centro.add(nota, BorderLayout.NORTH);
+        centro.add(arriba, BorderLayout.NORTH);
         centro.add(scroll, BorderLayout.CENTER);
         add(centro, BorderLayout.CENTER);
         add(botones, BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(760, 640));
+        setPreferredSize(new Dimension(940, 640));
         pack();
         setLocationRelativeTo(padre);
     }

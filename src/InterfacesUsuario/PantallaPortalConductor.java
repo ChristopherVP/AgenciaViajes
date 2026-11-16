@@ -86,7 +86,7 @@ public class PantallaPortalConductor extends JFrame {
         this.usuario = usuario;
         setTitle(objetosServicio.Marca.NOMBRE + " - Conductor: " + usuario.getNombre());
         setIconImage(IconoApp.crear(64));
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        Navegador.confirmarAlSalir(this);
         setLayout(new BorderLayout());
         lblAsignacion.setFont(Tema.fuente(Font.BOLD, 14f));
         add(BarraSuperior.crear(this, usuario, lblAsignacion, null), BorderLayout.NORTH);

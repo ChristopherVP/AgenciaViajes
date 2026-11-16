@@ -31,7 +31,7 @@ public class PantallaBienvenida extends JFrame {
 
     private void initComponents() {
         this.setTitle("Sistema de Transporte Interprovincial");
-        this.setDefaultCloseOperation(3);
+        Navegador.confirmarAlSalir(this);
         this.setExtendedState(6);
         this.setLocationRelativeTo((Component)null);
         JPanel panelFondo = new JPanel(new GridBagLayout());
