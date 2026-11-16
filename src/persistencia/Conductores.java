@@ -1,81 +1,36 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
 import excepciones.Validador;
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import objetosNegocio.Conductor;
 import objetosNegocio.Empresa;
 
-public class Conductores extends AccesoAleatorio {
-    public Conductores(String nomArchivo) {
-        super(nomArchivo, 290);
+/** Conductores en la tabla CONDUCTORES de Oracle. */
+public class Conductores {
+    private static final String COLUMNAS = "ID_CONDUCTOR, NOMBRE, CEDULA, TELEFONO, LICENCIA, ESTADO, ID_EMPRESA";
+
+    public Conductores(String ignorado) {
     }
 
-    private Conductor leeConductor() throws IOException {
+    private static Conductor mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
         Conductor c = new Conductor();
-        c.setIdConductor(this.leeString(10));
-        c.setNombre(this.leeString(50));
-        c.setCedula(this.leeString(15));
-        c.setTelefono(this.leeString(20));
-        c.setLicencia(this.leeString(20));
-        c.setEstado(this.leeString(20));
-        c.setEmpresa(new Empresa(this.leeString(10)));
+        c.setIdConductor(Bd.texto(rs, "ID_CONDUCTOR"));
+        c.setNombre(Bd.texto(rs, "NOMBRE"));
+        c.setCedula(Bd.texto(rs, "CEDULA"));
+        c.setTelefono(Bd.texto(rs, "TELEFONO"));
+        c.setLicencia(Bd.texto(rs, "LICENCIA"));
+        c.setEstado(Bd.texto(rs, "ESTADO"));
+        c.setEmpresa(new Empresa(Bd.texto(rs, "ID_EMPRESA")));
         return c;
     }
 
-    private void escribeConductor(Conductor c) throws IOException {
-        this.escribeString(c.getIdConductor(), 10);
-        this.escribeString(c.getNombre(), 50);
-        this.escribeString(c.getCedula(), 15);
-        this.escribeString(c.getTelefono(), 20);
-        this.escribeString(c.getLicencia(), 20);
-        this.escribeString(c.getEstado(), 20);
-        String idEmpresa = c.getEmpresa() != null ? c.getEmpresa().getIdEmpresa() : "";
-        this.escribeString(idEmpresa, 10);
+    private static String idEmpresa(Conductor c) {
+        return c.getEmpresa() != null ? c.getEmpresa().getIdEmpresa() : "";
     }
 
-    private boolean esConductorValido(Conductor c) {
-        return c != null && c.getIdConductor() != null && !c.getIdConductor().trim().isEmpty();
-    }
-
-    private String generarSiguienteCodigo() throws PersistenciaException {
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-            int max = 0;
-
-            try {
-                while(true) {
-                    Conductor c = this.leeConductor();
-                    if (this.esConductorValido(c) && c.getIdConductor().startsWith("CDN")) {
-                        try {
-                            int num = Integer.parseInt(c.getIdConductor().substring(3));
-                            if (num > max) {
-                                max = num;
-                            }
-                        } catch (NumberFormatException var4) {
-                        }
-                    }
-                }
-            } catch (EOFException var5) {
-                this.archivo.close();
-                return String.format("CDN%03d", max + 1);
-            }
-        } catch (IOException var6) {
-            return "CDN001";
-        }
-    }
-
-    private void validarConductor(Conductor c) throws PersistenciaException {
+    private void validar(Conductor c) throws PersistenciaException {
         if (!Validador.validarNoVacio(c.getNombre())) {
             throw new PersistenciaException("El nombre es obligatorio");
         } else if (!Validador.validarCedulaEcuatoriana(c.getCedula())) {
@@ -88,163 +43,42 @@ public class Conductores extends AccesoAleatorio {
     }
 
     public void agrega(Conductor c) throws PersistenciaException {
-        c.setIdConductor(this.generarSiguienteCodigo());
         if (c.getEstado() == null) {
             c.setEstado("ACTIVO");
         }
-
-        this.validarConductor(c);
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-            this.archivo.seek(this.archivo.length());
-            this.escribeConductor(c);
-            System.out.println("Conductor agregado: " + c.getIdConductor());
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al agregar conductor", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException var9) {
-            }
-
-        }
-
+        validar(c);
+        Bd.insertarConCodigo("CONDUCTORES", "ID_CONDUCTOR", "CDN", 3, c::setIdConductor,
+                "INSERT INTO CONDUCTORES (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?)",
+                id -> new Object[]{id, c.getNombre(), c.getCedula(), c.getTelefono(), c.getLicencia(), c.getEstado(), idEmpresa(c)});
     }
 
     public Conductor obten(Conductor busqueda) throws PersistenciaException {
-        Conductor var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            Conductor c;
-            do {
-                c = this.leeConductor();
-            } while(!this.esConductorValido(c) || !c.getIdConductor().equals(busqueda.getIdConductor()));
-
-            var3 = c;
-            return var3;
-        } catch (EOFException var14) {
-            var3 = null;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al leer conductor", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException var13) {
-            }
-
+        if (busqueda == null || busqueda.getIdConductor() == null || busqueda.getIdConductor().isEmpty()) {
+            return null;
         }
-
-        return var3;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM CONDUCTORES WHERE ID_CONDUCTOR = ?", Conductores::mapear, busqueda.getIdConductor());
     }
 
     public void actualiza(Conductor c) throws PersistenciaException {
-        this.validarConductor(c);
-        boolean encontrado = false;
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-
-            long pos;
-            Conductor leido;
-            do {
-                pos = this.archivo.getFilePointer();
-                leido = this.leeConductor();
-            } while(!this.esConductorValido(leido) || !leido.getIdConductor().equals(c.getIdConductor()));
-
-            this.archivo.seek(pos);
-            this.escribeConductor(c);
-            encontrado = true;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al actualizar conductor", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException var12) {
-            }
-
-        }
-
-        if (!encontrado) {
+        validar(c);
+        int n = Bd.actualizar("UPDATE CONDUCTORES SET NOMBRE=?, CEDULA=?, TELEFONO=?, LICENCIA=?, ESTADO=?, ID_EMPRESA=? WHERE ID_CONDUCTOR=?",
+                c.getNombre(), c.getCedula(), c.getTelefono(), c.getLicencia(), c.getEstado(), idEmpresa(c), c.getIdConductor());
+        if (n == 0) {
             throw new PersistenciaException("El conductor no existe");
         }
     }
 
     public void elimina(Conductor c) throws PersistenciaException {
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-            boolean encontrado = false;
-
-            long pos;
-            Conductor leido;
-            do {
-                pos = this.archivo.getFilePointer();
-                leido = this.leeConductor();
-            } while(!this.esConductorValido(leido) || !leido.getIdConductor().equals(c.getIdConductor()));
-
-            leido.setEstado("INACTIVO");
-            this.archivo.seek(pos);
-            this.escribeConductor(leido);
-            encontrado = true;
-            if (!encontrado) {
-                throw new PersistenciaException("El conductor no existe");
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al eliminar conductor", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException var12) {
-            }
-
+        if (Bd.actualizar("DELETE FROM CONDUCTORES WHERE ID_CONDUCTOR = ?", c.getIdConductor()) == 0) {
+            throw new PersistenciaException("El conductor no existe");
         }
-
     }
 
     public List<Conductor> lista() throws PersistenciaException {
-        List<Conductor> lista = new ArrayList();
-
-        Object var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            while(true) {
-                Conductor c = this.leeConductor();
-                if (this.esConductorValido(c)) {
-                    lista.add(c);
-                }
-            }
-        } catch (EOFException var13) {
-            var3 = lista;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al listar conductores", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException var12) {
-            }
-
-        }
-
-        return (List<Conductor>)var3;
-    }
-
-    private static boolean esConductorDeEmpresa(Conductor c, String idEmpresa) {
-        return c.getEmpresa() != null && idEmpresa.equals(c.getEmpresa().getIdEmpresa());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM CONDUCTORES ORDER BY ID_CONDUCTOR", Conductores::mapear);
     }
 
     public List<Conductor> listaPorEmpresa(String idEmpresa) throws PersistenciaException {
-        return (List)this.lista().stream().filter((c) -> esConductorDeEmpresa(c, idEmpresa)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM CONDUCTORES WHERE ID_EMPRESA = ? ORDER BY ID_CONDUCTOR", Conductores::mapear, idEmpresa);
     }
 }

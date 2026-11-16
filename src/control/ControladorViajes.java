@@ -23,6 +23,20 @@ import objetosServicio.Periodo;
 public class ControladorViajes {
     private IFachada fachada = FachadaArchivos.getInstance();
 
+
+    /** Fecha y hora de salida como momento; null si falta algún dato. */
+    static java.time.LocalDateTime salidaDe(Fecha fecha, String hora) {
+        try {
+            if (fecha == null || fecha.getAnio() <= 0 || hora == null || !hora.contains(":")) {
+                return null;
+            }
+            String[] h = hora.trim().split(":");
+            return java.time.LocalDateTime.of(fecha.getAnio(), fecha.getMes(), fecha.getDia(), Integer.parseInt(h[0]), Integer.parseInt(h[1]));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
     public ResultadoOperacion programarViaje(String idViaje, String idBus, String idRuta, Fecha fechaSalida, Fecha fechaLlegada, String idEmpresa, String estado, boolean generarAsientos, String horaSalida, String horaLlegada, double precio, String idConductor1, String idConductor2) {
         try {
             ResultadoOperacion validacion = this.validarDatosViaje(idBus, idRuta, fechaSalida, fechaLlegada, estado, idEmpresa);
@@ -55,6 +69,10 @@ public class ControladorViajes {
                             String sinAsignacion = new ControladorAsignaciones().errorParaViaje(idConductor1, idBus, idRuta);
                             if (sinAsignacion != null) {
                                 return new ResultadoOperacion(false, sinAsignacion);
+                            }
+                            String continuidad = new ControladorAsignaciones().errorDeContinuidad(idConductor1, idRuta, salidaDe(fechaSalida, horaSalida), null);
+                            if (continuidad != null) {
+                                return new ResultadoOperacion(false, continuidad);
                             }
                             ResultadoOperacion disponibilidad = this.verificarDisponibilidadBus(idBus, fechaSalida, fechaLlegada, horaSalida, horaLlegada, idViaje);
                             if (!disponibilidad.isExito()) {
@@ -115,6 +133,15 @@ public class ControladorViajes {
                                             : new ControladorAsignaciones().errorParaViaje(idConductor1, idBus, idRuta);
                                     if (sinAsignacion != null) {
                                         return new ResultadoOperacion(false, sinAsignacion);
+                                    }
+                                    boolean cambioContinuidad = viajeExistente.getRuta() == null || !idRuta.equals(viajeExistente.getRuta().getIdRuta())
+                                            || viajeExistente.getConductor1() == null || !idConductor1.equals(viajeExistente.getConductor1().getIdConductor())
+                                            || !java.util.Objects.equals(salidaDe(viajeExistente.getFechaSalida(), viajeExistente.getHoraSalida()), salidaDe(fechaSalida, horaSalida));
+                                    if (cambioContinuidad) {
+                                        String continuidad = new ControladorAsignaciones().errorDeContinuidad(idConductor1, idRuta, salidaDe(fechaSalida, horaSalida), idViaje);
+                                        if (continuidad != null) {
+                                            return new ResultadoOperacion(false, continuidad);
+                                        }
                                     }
                                     viajeExistente.setBus(bus);
                                     viajeExistente.setRuta(ruta);

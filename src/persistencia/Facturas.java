@@ -1,338 +1,99 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
 import excepciones.Validador;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import objetosNegocio.Empresa;
 import objetosNegocio.Factura;
 import objetosNegocio.Pasajero;
 import objetosNegocio.Reserva;
 
-public class Facturas extends AccesoAleatorio {
-    public Facturas(String nomArchivo) {
-        super(nomArchivo, 630);
+/** Facturas de reservas en la tabla FACTURAS de Oracle (los comprobantes del libro de facturación están en COMPROBANTES). */
+public class Facturas {
+    private static final String COLUMNAS = "ID_FACTURA, ID_PASAJERO, ID_RESERVA, TOTAL, FECHA_EMISION, ESTADO, ID_EMPRESA, NOMBRE_EMPRESA_SNAPSHOT, "
+            + "RUC_EMPRESA_SNAPSHOT, DIRECCION_EMPRESA_SNAPSHOT, NOMBRE_VENDEDOR, DATOS_PASAJERO_SNAPSHOT";
+
+    public Facturas(String ignorado) {
     }
 
-    private Factura leeFactura() throws IOException {
-        Factura factura = new Factura();
-        factura.setIdFactura(this.leeString(10));
-        factura.setPasajero(new Pasajero(this.leeString(10)));
-        factura.setReserva(new Reserva(this.leeString(10)));
-        factura.setTotal(this.archivo.readDouble());
-        factura.setFechaEmision(this.leeFecha());
-        factura.setEstado(this.leeString(20));
-        factura.setEmpresa(new Empresa(this.leeString(10)));
-        factura.setNombreEmpresaSnapshot(this.leeString(50));
-        factura.setRucEmpresaSnapshot(this.leeString(15));
-        factura.setDireccionEmpresaSnapshot(this.leeString(80));
-        factura.setNombreVendedor(this.leeString(50));
-        factura.setDatosPasajeroSnapshot(this.leeString(50));
-        return factura;
+    private static Factura mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Factura f = new Factura();
+        f.setIdFactura(Bd.texto(rs, "ID_FACTURA"));
+        f.setPasajero(new Pasajero(Bd.texto(rs, "ID_PASAJERO")));
+        f.setReserva(new Reserva(Bd.texto(rs, "ID_RESERVA")));
+        f.setTotal(rs.getDouble("TOTAL"));
+        f.setFechaEmision(Bd.fecha(rs, "FECHA_EMISION"));
+        f.setEstado(Bd.texto(rs, "ESTADO"));
+        f.setEmpresa(new Empresa(Bd.texto(rs, "ID_EMPRESA")));
+        f.setNombreEmpresaSnapshot(Bd.texto(rs, "NOMBRE_EMPRESA_SNAPSHOT"));
+        f.setRucEmpresaSnapshot(Bd.texto(rs, "RUC_EMPRESA_SNAPSHOT"));
+        f.setDireccionEmpresaSnapshot(Bd.texto(rs, "DIRECCION_EMPRESA_SNAPSHOT"));
+        f.setNombreVendedor(Bd.texto(rs, "NOMBRE_VENDEDOR"));
+        f.setDatosPasajeroSnapshot(Bd.texto(rs, "DATOS_PASAJERO_SNAPSHOT"));
+        return f;
     }
 
-    private void escribeFactura(Factura factura) throws IOException {
-        this.escribeString(factura.getIdFactura(), 10);
-        String idPasajero = factura.getPasajero() != null ? factura.getPasajero().getIdPasajero() : "";
-        String idReserva = factura.getReserva() != null ? factura.getReserva().getIdReserva() : "";
-        this.escribeString(idPasajero, 10);
-        this.escribeString(idReserva, 10);
-        this.archivo.writeDouble(factura.getTotal());
-        this.escribeFecha(factura.getFechaEmision());
-        this.escribeString(factura.getEstado(), 20);
-        String idEmpresa = factura.getEmpresa() != null ? factura.getEmpresa().getIdEmpresa() : "";
-        this.escribeString(idEmpresa, 10);
-        this.escribeString(factura.getNombreEmpresaSnapshot(), 50);
-        this.escribeString(factura.getRucEmpresaSnapshot(), 15);
-        this.escribeString(factura.getDireccionEmpresaSnapshot(), 80);
-        this.escribeString(factura.getNombreVendedor(), 50);
-        this.escribeString(factura.getDatosPasajeroSnapshot(), 50);
-    }
-
-    private boolean esFacturaValida(Factura factura) {
-        return factura != null && factura.getIdFactura() != null && !factura.getIdFactura().trim().isEmpty();
-    }
-
-    private String generarSiguienteCodigoFactura() throws PersistenciaException {
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-            int maxNumero = 0;
-
-            try {
-                while(true) {
-                    Factura factura = this.leeFactura();
-                    if (this.esFacturaValida(factura)) {
-                        String codigo = factura.getIdFactura();
-                        if (codigo.startsWith("FAC") && codigo.length() > 3) {
-                            try {
-                                int numero = Integer.parseInt(codigo.substring(3));
-                                if (numero > maxNumero) {
-                                    maxNumero = numero;
-                                }
-                            } catch (NumberFormatException var5) {
-                            }
-                        }
-                    }
-                }
-            } catch (EOFException var6) {
-                this.archivo.close();
-                int siguienteNumero = maxNumero + 1;
-                return String.format("FAC%03d", siguienteNumero);
-            }
-        } catch (FileNotFoundException var7) {
-            return "FAC001";
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al generar código de factura", e);
-        }
-    }
-
-    private void validarFactura(Factura factura) throws PersistenciaException {
-        if (!Validador.validarNumeroPositivo(factura.getTotal())) {
+    private void validar(Factura f) throws PersistenciaException {
+        if (!Validador.validarNumeroPositivo(f.getTotal())) {
             throw new PersistenciaException(Validador.getMensajeErrorNumeroPositivo("El total"));
-        } else if (!Validador.validarNoVacio(factura.getEstado())) {
+        } else if (!Validador.validarNoVacio(f.getEstado())) {
             throw new PersistenciaException("El estado no puede estar vacío");
-        } else if (factura.getPasajero() != null && Validador.validarNoVacio(factura.getPasajero().getIdPasajero())) {
-            if (factura.getReserva() != null && Validador.validarNoVacio(factura.getReserva().getIdReserva())) {
-                if (factura.getEmpresa() == null || !Validador.validarNoVacio(factura.getEmpresa().getIdEmpresa())) {
-                    throw new PersistenciaException("Debe asignar una empresa a la factura");
-                }
-            } else {
-                throw new PersistenciaException("Debe asignar una reserva a la factura");
-            }
-        } else {
+        } else if (f.getPasajero() == null || !Validador.validarNoVacio(f.getPasajero().getIdPasajero())) {
             throw new PersistenciaException("Debe asignar un pasajero a la factura");
+        } else if (f.getReserva() == null || !Validador.validarNoVacio(f.getReserva().getIdReserva())) {
+            throw new PersistenciaException("Debe asignar una reserva a la factura");
+        } else if (f.getEmpresa() == null || !Validador.validarNoVacio(f.getEmpresa().getIdEmpresa())) {
+            throw new PersistenciaException("Debe asignar una empresa a la factura");
         }
+    }
+
+    private static Object[] valores(String id, Factura f) {
+        return new Object[]{id, f.getPasajero().getIdPasajero(), f.getReserva().getIdReserva(), f.getTotal(), f.getFechaEmision(), f.getEstado(),
+                f.getEmpresa().getIdEmpresa(), f.getNombreEmpresaSnapshot(), f.getRucEmpresaSnapshot(), f.getDireccionEmpresaSnapshot(),
+                f.getNombreVendedor(), f.getDatosPasajeroSnapshot()};
     }
 
     public Factura obten(Factura factura) throws PersistenciaException {
-        Factura var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            Factura facturaLeida;
-            do {
-                facturaLeida = this.leeFactura();
-            } while(!this.esFacturaValida(facturaLeida) || !facturaLeida.getIdFactura().equals(factura.getIdFactura()));
-
-            var3 = facturaLeida;
-            return var3;
-        } catch (FileNotFoundException var15) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var16) {
-            var3 = null;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar el archivo", e);
-            }
-
+        if (factura == null || factura.getIdFactura() == null || factura.getIdFactura().isEmpty()) {
+            return null;
         }
-
-        return var3;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM FACTURAS WHERE ID_FACTURA = ?", Facturas::mapear, factura.getIdFactura());
     }
 
-    public void agrega(Factura factura) throws PersistenciaException {
-        String codigoGenerado = this.generarSiguienteCodigoFactura();
-        factura.setIdFactura(codigoGenerado);
-        this.validarFactura(factura);
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-            this.archivo.seek(this.archivo.length());
-            this.escribeFactura(factura);
-            System.out.println("Factura agregada: " + factura.getIdFactura());
-        } catch (FileNotFoundException var11) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar el archivo", e);
-            }
-
-        }
-
+    public void agrega(Factura f) throws PersistenciaException {
+        validar(f);
+        Bd.insertarConCodigo("FACTURAS", "ID_FACTURA", "FAC", 3, f::setIdFactura,
+                "INSERT INTO FACTURAS (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", id -> valores(id, f));
     }
 
-    public void actualiza(Factura factura) throws PersistenciaException {
-        this.validarFactura(factura);
-        boolean encontrada = false;
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-
-            long posicionAntes;
-            Factura facturaLeida;
-            do {
-                posicionAntes = this.archivo.getFilePointer();
-                facturaLeida = this.leeFactura();
-            } while(!this.esFacturaValida(facturaLeida) || !facturaLeida.getIdFactura().equals(factura.getIdFactura()));
-
-            this.archivo.seek(posicionAntes);
-            this.escribeFactura(factura);
-            System.out.println("✓ Factura actualizada: " + factura.getIdFactura());
-            encontrada = true;
-        } catch (FileNotFoundException var16) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var17) {
-            if (!encontrada) {
-                throw new PersistenciaException("La factura no existe");
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar", e);
-            }
-
-        }
-
-        if (!encontrada) {
+    public void actualiza(Factura f) throws PersistenciaException {
+        validar(f);
+        int n = Bd.actualizar("UPDATE FACTURAS SET ID_PASAJERO=?, ID_RESERVA=?, TOTAL=?, FECHA_EMISION=?, ESTADO=?, ID_EMPRESA=?, NOMBRE_EMPRESA_SNAPSHOT=?, "
+                        + "RUC_EMPRESA_SNAPSHOT=?, DIRECCION_EMPRESA_SNAPSHOT=?, NOMBRE_VENDEDOR=?, DATOS_PASAJERO_SNAPSHOT=? WHERE ID_FACTURA=?",
+                f.getPasajero().getIdPasajero(), f.getReserva().getIdReserva(), f.getTotal(), f.getFechaEmision(), f.getEstado(), f.getEmpresa().getIdEmpresa(),
+                f.getNombreEmpresaSnapshot(), f.getRucEmpresaSnapshot(), f.getDireccionEmpresaSnapshot(), f.getNombreVendedor(), f.getDatosPasajeroSnapshot(),
+                f.getIdFactura());
+        if (n == 0) {
             throw new PersistenciaException("La factura no existe");
         }
     }
 
-    public void elimina(Factura factura) throws PersistenciaException {
-        File archivoOriginal = new File(this.nomArchivo);
-        File archivoTemporal = new File(this.nomArchivo + ".tmp");
-
-        try {
-            System.out.println("\n=== ELIMINANDO FACTURA: " + factura.getIdFactura() + " ===");
-            this.archivo = new RandomAccessFile(archivoOriginal, "r");
-            List<Factura> todasLasFacturas = new ArrayList();
-            boolean encontrada = false;
-
-            try {
-                while(true) {
-                    Factura f = this.leeFactura();
-                    if (this.esFacturaValida(f)) {
-                        if (!f.getIdFactura().equals(factura.getIdFactura())) {
-                            todasLasFacturas.add(f);
-                            System.out.println("  → Mantener: " + f.getIdFactura());
-                        } else {
-                            encontrada = true;
-                            System.out.println("  ✗ Eliminar: " + f.getIdFactura());
-                        }
-                    }
-                }
-            } catch (EOFException var17) {
-                this.archivo.close();
-                this.archivo = null;
-                if (!encontrada) {
-                    throw new PersistenciaException("La factura no existe");
-                }
-            }
-
-            System.out.println("Total a mantener: " + todasLasFacturas.size());
-            this.archivo = new RandomAccessFile(archivoTemporal, "rw");
-
-            for(Factura f : todasLasFacturas) {
-                this.escribeFactura(f);
-            }
-
-            this.archivo.close();
-            this.archivo = null;
-            if (!archivoOriginal.delete()) {
-                throw new PersistenciaException("No se pudo eliminar el archivo original");
-            }
-
-            if (!archivoTemporal.renameTo(archivoOriginal)) {
-                throw new PersistenciaException("No se pudo renombrar el archivo temporal");
-            }
-
-            System.out.println("✓ Factura eliminada exitosamente");
-            System.out.println("===================================\n");
-        } catch (FileNotFoundException var18) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (IOException e) {
-            throw new PersistenciaException("Error: " + e.getMessage(), e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            if (archivoTemporal.exists()) {
-                archivoTemporal.delete();
-            }
-
+    public void elimina(Factura f) throws PersistenciaException {
+        if (Bd.actualizar("DELETE FROM FACTURAS WHERE ID_FACTURA = ?", f.getIdFactura()) == 0) {
+            throw new PersistenciaException("La factura no existe");
         }
-
     }
 
     public List<Factura> lista() throws PersistenciaException {
-        List<Factura> lista = new ArrayList();
-
-        Object var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            while(true) {
-                Factura facturaLeida = this.leeFactura();
-                if (this.esFacturaValida(facturaLeida)) {
-                    lista.add(facturaLeida);
-                }
-            }
-        } catch (FileNotFoundException var14) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var15) {
-            var3 = lista;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar", e);
-            }
-
-        }
-
-        return (List<Factura>)var3;
-    }
-
-    private static boolean esFacturaDePasajero(Factura factura, String idPasajero) {
-        return factura.getPasajero() != null && idPasajero.equals(factura.getPasajero().getIdPasajero());
-    }
-
-    private static boolean esFacturaConEstado(Factura factura, String estado) {
-        return estado.equals(factura.getEstado());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM FACTURAS ORDER BY ID_FACTURA", Facturas::mapear);
     }
 
     public List<Factura> listaPorPasajero(String idPasajero) throws PersistenciaException {
-        return (List)this.lista().stream().filter((factura) -> esFacturaDePasajero(factura, idPasajero)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM FACTURAS WHERE ID_PASAJERO = ? ORDER BY ID_FACTURA", Facturas::mapear, idPasajero);
     }
 
     public List<Factura> listaPorEstado(String estado) throws PersistenciaException {
-        return (List)this.lista().stream().filter((factura) -> esFacturaConEstado(factura, estado)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM FACTURAS WHERE ESTADO = ? ORDER BY ID_FACTURA", Facturas::mapear, estado);
     }
 }

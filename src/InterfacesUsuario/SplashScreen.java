@@ -26,7 +26,7 @@ import javax.swing.Timer;
 public class SplashScreen extends JWindow {
     private static final int ANCHO = 760;
     private static final int ALTO = 420;
-    private static final long DURACION_MINIMA_MS = 1500;
+    private static final long DURACION_MINIMA_MS = 0;
     private static final long CAMBIO_FRASE_MS = 1500;
 
     private static final String[][] FRASES = {
@@ -71,7 +71,7 @@ public class SplashScreen extends JWindow {
         animacion = new Timer(25, e -> {
             long ahora = System.currentTimeMillis();
             alfaLogo = Math.min(1f, alfaLogo + 0.045f);
-            progresoMostrado += (progresoObjetivo - progresoMostrado) * 0.10;
+            progresoMostrado += (progresoObjetivo - progresoMostrado) * 0.35;
             if (ahora - inicioFrase > CAMBIO_FRASE_MS) {
                 frase = (frase + 1) % FRASES.length;
                 inicioFrase = ahora;
@@ -112,7 +112,7 @@ public class SplashScreen extends JWindow {
             protected void done() {
                 Timer espera = new Timer(30, null);
                 espera.addActionListener(ev -> {
-                    if (fallo != null || progresoMostrado >= 99.3) {
+                    if (fallo != null || progresoMostrado >= 98.5) {
                         espera.stop();
                         terminar();
                     }

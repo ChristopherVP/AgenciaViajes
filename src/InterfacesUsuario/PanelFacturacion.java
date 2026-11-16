@@ -38,7 +38,7 @@ public class PanelFacturacion extends JPanel {
     /** Tipo de comprobante de cada opción del filtro ("" = todos), según quién mira la pantalla. */
     private final String[] tiposDelFiltro;
     private final JLabel lblEstado = Tema.mensaje();
-    private final JPanel resumen = new JPanel(new GridLayout(1, 0, 10, 0));
+    private final JPanel resumen = new JPanel(new GridLayout(2, 0, 10, 8));
     private List<Comprobante> actuales = new ArrayList<>();
 
     public PanelFacturacion(Usuario usuario, boolean administracion) {
@@ -146,6 +146,9 @@ public class PanelFacturacion extends JPanel {
         if (administracion) {
             ControladorFacturacion.Resumen rs = controlador.resumen();
             resumen.removeAll();
+            resumen.add(tarjeta("DINERO TOTAL DE LA EMPRESA (caja)", String.format("$%.2f", rs.cajaEmpresa)));
+            resumen.add(tarjeta("Saldo en billeteras (de pasajeros)", String.format("$%.2f", rs.saldoBilleteras)));
+            resumen.add(tarjeta("Dinero propio (sin deudas)", String.format("$%.2f", rs.dineroPropio)));
             resumen.add(tarjeta("Ingresos por venta de pasajes", String.format("$%.2f", rs.ventasPasajes)));
             resumen.add(tarjeta("Recargas acreditadas", String.format("$%.2f", rs.recargasAcreditadas)));
             resumen.add(tarjeta("Pagado a conductores (80 %)", String.format("$%.2f", rs.pagadoConductores)));

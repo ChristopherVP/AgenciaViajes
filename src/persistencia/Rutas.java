@@ -1,97 +1,44 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
 import excepciones.Validador;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import objetosNegocio.Empresa;
 import objetosNegocio.Ruta;
 
-public class Rutas extends AccesoAleatorio {
-    public Rutas(String nomArchivo) {
-        super(nomArchivo, 708);
+/** Rutas en la tabla RUTAS de Oracle. */
+public class Rutas {
+    private static final String COLUMNAS = "ID_RUTA, ORIGEN, DESTINO, DISTANCIA, PRECIO, ID_EMPRESA, TIEMPO_ESTIMADO, PARADAS, TIEMPO_DETENCION, ADVERTENCIAS, ESTADO";
+
+    public Rutas(String ignorado) {
     }
 
-    private Ruta leeRuta() throws IOException {
-        Ruta ruta = new Ruta();
-        ruta.setIdRuta(this.leeString(10));
-        ruta.setOrigen(this.leeString(50));
-        ruta.setDestino(this.leeString(50));
-        ruta.setDistancia(this.archivo.readDouble());
-        ruta.setPrecio(this.archivo.readDouble());
-        ruta.setEmpresa(new Empresa(this.leeString(10)));
-        ruta.setTiempoEstimado(this.archivo.readDouble());
-        ruta.setParadas(this.leeString(100));
-        ruta.setTiempoDetencion(this.archivo.readInt());
-        ruta.setAdvertencias(this.leeString(100));
-        ruta.setEstado(this.leeString(20));
-        return ruta;
+    private static Ruta mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Ruta r = new Ruta();
+        r.setIdRuta(Bd.texto(rs, "ID_RUTA"));
+        r.setOrigen(Bd.texto(rs, "ORIGEN"));
+        r.setDestino(Bd.texto(rs, "DESTINO"));
+        r.setDistancia(rs.getDouble("DISTANCIA"));
+        r.setPrecio(rs.getDouble("PRECIO"));
+        r.setEmpresa(new Empresa(Bd.texto(rs, "ID_EMPRESA")));
+        r.setTiempoEstimado(rs.getDouble("TIEMPO_ESTIMADO"));
+        r.setParadas(Bd.texto(rs, "PARADAS"));
+        r.setTiempoDetencion(rs.getInt("TIEMPO_DETENCION"));
+        r.setAdvertencias(Bd.texto(rs, "ADVERTENCIAS"));
+        r.setEstado(Bd.texto(rs, "ESTADO"));
+        return r;
     }
 
-    private void escribeRuta(Ruta ruta) throws IOException {
-        this.escribeString(ruta.getIdRuta(), 10);
-        this.escribeString(ruta.getOrigen(), 50);
-        this.escribeString(ruta.getDestino(), 50);
-        this.archivo.writeDouble(ruta.getDistancia());
-        this.archivo.writeDouble(ruta.getPrecio());
-        String idEmpresa = ruta.getEmpresa() != null ? ruta.getEmpresa().getIdEmpresa() : "";
-        this.escribeString(idEmpresa, 10);
-        this.archivo.writeDouble(ruta.getTiempoEstimado());
-        this.escribeString(ruta.getParadas() != null ? ruta.getParadas() : "", 100);
-        this.archivo.writeInt(ruta.getTiempoDetencion());
-        this.escribeString(ruta.getAdvertencias() != null ? ruta.getAdvertencias() : "", 100);
-        this.escribeString(ruta.getEstado() != null ? ruta.getEstado() : "ACTIVA", 20);
+    private static String idEmpresa(Ruta r) {
+        return r.getEmpresa() != null ? r.getEmpresa().getIdEmpresa() : "";
     }
 
-    private boolean esRutaValida(Ruta ruta) {
-        return ruta != null && ruta.getIdRuta() != null && !ruta.getIdRuta().trim().isEmpty();
+    private static String estado(Ruta r) {
+        return r.getEstado() != null && !r.getEstado().isEmpty() ? r.getEstado() : "ACTIVA";
     }
 
-    private String generarSiguienteCodigoRuta() throws PersistenciaException {
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-            int maxNumero = 0;
-
-            try {
-                while(true) {
-                    Ruta ruta = this.leeRuta();
-                    if (this.esRutaValida(ruta)) {
-                        String codigo = ruta.getIdRuta();
-                        if (codigo.startsWith("RUTA") && codigo.length() > 4) {
-                            try {
-                                int numero = Integer.parseInt(codigo.substring(4));
-                                if (numero > maxNumero) {
-                                    maxNumero = numero;
-                                }
-                            } catch (NumberFormatException var5) {
-                            }
-                        }
-                    }
-                }
-            } catch (EOFException var6) {
-                this.archivo.close();
-                int siguienteNumero = maxNumero + 1;
-                return String.format("RUTA%03d", siguienteNumero);
-            }
-        } catch (FileNotFoundException var7) {
-            return "RUTA001";
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al generar código de ruta", e);
-        }
-    }
-
-    private void validarRuta(Ruta ruta) throws PersistenciaException {
+    private void validar(Ruta ruta) throws PersistenciaException {
         if (!Validador.validarNoVacio(ruta.getOrigen())) {
             throw new PersistenciaException("El origen no puede estar vacío");
         } else if (!Validador.validarNoVacio(ruta.getDestino())) {
@@ -108,223 +55,45 @@ public class Rutas extends AccesoAleatorio {
     }
 
     public Ruta obten(Ruta ruta) throws PersistenciaException {
-        Ruta var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            Ruta rutaLeida;
-            do {
-                rutaLeida = this.leeRuta();
-            } while(!this.esRutaValida(rutaLeida) || !rutaLeida.getIdRuta().equals(ruta.getIdRuta()));
-
-            var3 = rutaLeida;
-            return var3;
-        } catch (FileNotFoundException var15) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var16) {
-            var3 = null;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar el archivo", e);
-            }
-
+        if (ruta == null || ruta.getIdRuta() == null || ruta.getIdRuta().isEmpty()) {
+            return null;
         }
-
-        return var3;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM RUTAS WHERE ID_RUTA = ?", Rutas::mapear, ruta.getIdRuta());
     }
 
-    public void agrega(Ruta ruta) throws PersistenciaException {
-        String codigoGenerado = this.generarSiguienteCodigoRuta();
-        ruta.setIdRuta(codigoGenerado);
-        this.validarRuta(ruta);
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-            this.archivo.seek(this.archivo.length());
-            this.escribeRuta(ruta);
-            System.out.println("Ruta agregrada: " + ruta.getIdRuta());
-        } catch (FileNotFoundException var11) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar el archivo", e);
-            }
-
-        }
-
+    public void agrega(Ruta r) throws PersistenciaException {
+        validar(r);
+        Bd.insertarConCodigo("RUTAS", "ID_RUTA", "RUTA", 3, r::setIdRuta,
+                "INSERT INTO RUTAS (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                id -> new Object[]{id, r.getOrigen(), r.getDestino(), r.getDistancia(), r.getPrecio(), idEmpresa(r), r.getTiempoEstimado(),
+                        r.getParadas(), r.getTiempoDetencion(), r.getAdvertencias(), estado(r)});
     }
 
-    public void actualiza(Ruta ruta) throws PersistenciaException {
-        this.validarRuta(ruta);
-        boolean encontrada = false;
-
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-
-            long posicionAntes;
-            Ruta rutaLeida;
-            do {
-                posicionAntes = this.archivo.getFilePointer();
-                rutaLeida = this.leeRuta();
-            } while(!this.esRutaValida(rutaLeida) || !rutaLeida.getIdRuta().equals(ruta.getIdRuta()));
-
-            this.archivo.seek(posicionAntes);
-            this.escribeRuta(ruta);
-            System.out.println("✓ Ruta actualizada: " + ruta.getIdRuta());
-            encontrada = true;
-        } catch (FileNotFoundException var16) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var17) {
-            if (!encontrada) {
-                throw new PersistenciaException("La ruta no existe");
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar", e);
-            }
-
-        }
-
-        if (!encontrada) {
+    public void actualiza(Ruta r) throws PersistenciaException {
+        validar(r);
+        int n = Bd.actualizar("UPDATE RUTAS SET ORIGEN=?, DESTINO=?, DISTANCIA=?, PRECIO=?, ID_EMPRESA=?, TIEMPO_ESTIMADO=?, PARADAS=?, TIEMPO_DETENCION=?, ADVERTENCIAS=?, ESTADO=? WHERE ID_RUTA=?",
+                r.getOrigen(), r.getDestino(), r.getDistancia(), r.getPrecio(), idEmpresa(r), r.getTiempoEstimado(), r.getParadas(),
+                r.getTiempoDetencion(), r.getAdvertencias(), estado(r), r.getIdRuta());
+        if (n == 0) {
             throw new PersistenciaException("La ruta no existe");
         }
     }
 
-    public void elimina(Ruta ruta) throws PersistenciaException {
-        File archivoOriginal = new File(this.nomArchivo);
-        File archivoTemporal = new File(this.nomArchivo + ".tmp");
-
-        try {
-            System.out.println("\n=== ELIMINANDO RUTA: " + ruta.getIdRuta() + " ===");
-            this.archivo = new RandomAccessFile(archivoOriginal, "r");
-            List<Ruta> todasLasRutas = new ArrayList();
-            boolean encontrada = false;
-
-            try {
-                while(true) {
-                    Ruta r = this.leeRuta();
-                    if (this.esRutaValida(r)) {
-                        if (!r.getIdRuta().equals(ruta.getIdRuta())) {
-                            todasLasRutas.add(r);
-                            System.out.println("  → Mantener: " + r.getIdRuta());
-                        } else {
-                            encontrada = true;
-                            System.out.println("  ✗ Eliminar: " + r.getIdRuta());
-                        }
-                    }
-                }
-            } catch (EOFException var17) {
-                this.archivo.close();
-                this.archivo = null;
-                if (!encontrada) {
-                    throw new PersistenciaException("La ruta no existe");
-                }
-            }
-
-            System.out.println("Total a mantener: " + todasLasRutas.size());
-            this.archivo = new RandomAccessFile(archivoTemporal, "rw");
-
-            for(Ruta r : todasLasRutas) {
-                this.escribeRuta(r);
-            }
-
-            this.archivo.close();
-            this.archivo = null;
-            if (!archivoOriginal.delete()) {
-                throw new PersistenciaException("No se pudo eliminar el archivo original");
-            }
-
-            if (!archivoTemporal.renameTo(archivoOriginal)) {
-                throw new PersistenciaException("No se pudo renombrar el archivo temporal");
-            }
-
-            System.out.println("✓ Ruta eliminada exitosamente");
-            System.out.println("===================================\n");
-        } catch (FileNotFoundException var18) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (IOException e) {
-            throw new PersistenciaException("Error: " + e.getMessage(), e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-
-            if (archivoTemporal.exists()) {
-                archivoTemporal.delete();
-            }
-
+    public void elimina(Ruta r) throws PersistenciaException {
+        if (Bd.actualizar("DELETE FROM RUTAS WHERE ID_RUTA = ?", r.getIdRuta()) == 0) {
+            throw new PersistenciaException("La ruta no existe");
         }
-
     }
 
     public List<Ruta> lista() throws PersistenciaException {
-        List<Ruta> lista = new ArrayList();
-
-        Object var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            while(true) {
-                Ruta rutaLeida = this.leeRuta();
-                if (this.esRutaValida(rutaLeida)) {
-                    lista.add(rutaLeida);
-                }
-            }
-        } catch (FileNotFoundException var14) {
-            throw new PersistenciaException("Archivo inexistente");
-        } catch (EOFException var15) {
-            var3 = lista;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al acceder al archivo", e);
-        } finally {
-            try {
-                if (this.archivo != null) {
-                    this.archivo.close();
-                }
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al cerrar", e);
-            }
-
-        }
-
-        return (List<Ruta>)var3;
-    }
-
-    private static boolean esRutaConOrigen(Ruta ruta, String origen) {
-        return origen.equals(ruta.getOrigen());
-    }
-
-    private static boolean esRutaConDestino(Ruta ruta, String destino) {
-        return destino.equals(ruta.getDestino());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM RUTAS ORDER BY ID_RUTA", Rutas::mapear);
     }
 
     public List<Ruta> listaPorOrigen(String origen) throws PersistenciaException {
-        return (List)this.lista().stream().filter((ruta) -> esRutaConOrigen(ruta, origen)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM RUTAS WHERE ORIGEN = ? ORDER BY ID_RUTA", Rutas::mapear, origen);
     }
 
     public List<Ruta> listaPorDestino(String destino) throws PersistenciaException {
-        return (List)this.lista().stream().filter((ruta) -> esRutaConDestino(ruta, destino)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM RUTAS WHERE DESTINO = ? ORDER BY ID_RUTA", Rutas::mapear, destino);
     }
 }

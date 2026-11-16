@@ -41,6 +41,8 @@ public class ControladorSimulacion {
         public String proximoOrigen = "";
         /** Último destino al que lo mandó la administración. */
         public String ultimoDestino = "";
+        /** Su último viaje asignado: "Quito → Loja (llega 16/11/2026 09:00)". */
+        public String ultimoViaje = "—";
         /** Hora más temprana a la que puede salir el siguiente viaje (después de terminar el actual y descansar). */
         public LocalDateTime disponibleDesde = LocalDateTime.now();
         public String idViajeActual = "";
@@ -220,6 +222,7 @@ public class ControladorSimulacion {
                 Ruta r = rutaDe(ultimoAsignado);
                 u.proximoOrigen = r == null ? "" : r.getDestino();
                 u.ultimoDestino = u.proximoOrigen;
+                u.ultimoViaje = (r == null ? "?" : r.getOrigen() + " → " + r.getDestino()) + " (llega " + ControladorCompras.llegadaDe(ultimoAsignado).format(ControladorLiquidaciones.FECHA) + ")";
                 LocalDateTime libre = ControladorCompras.llegadaDe(ultimoAsignado).plusMinutes(MINUTOS_DESCANSO);
                 u.disponibleDesde = libre.isAfter(ahora) ? libre : ahora;
             } else {

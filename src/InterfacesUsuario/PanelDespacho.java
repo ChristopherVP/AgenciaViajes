@@ -33,7 +33,7 @@ public class PanelDespacho extends JPanel {
     private final ControladorNotificaciones notificaciones = new ControladorNotificaciones();
     private final Usuario usuario;
     private final DefaultTableModel modelo = new DefaultTableModel(
-            new String[]{"Conductor", "Bus", "Situación", "Dónde está", "Último destino", "Próximo origen", "Libre desde", "Por aceptar", "Programados"}, 0) {
+            new String[]{"Conductor", "Bus", "Situación", "Dónde está", "Último viaje", "Saldrá desde", "Libre desde", "Por aceptar", "Programados"}, 0) {
         @Override
         public boolean isCellEditable(int r, int c) {
             return false;
@@ -56,7 +56,7 @@ public class PanelDespacho extends JPanel {
         setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
         Tema.tabla(tabla);
         tabla.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-        int[] anchos = {170, 90, 170, 280, 110, 110, 130, 80, 90};
+        int[] anchos = {170, 90, 170, 280, 260, 110, 130, 80, 90};
         for (int i = 0; i < anchos.length; i++) {
             tabla.getColumnModel().getColumn(i).setPreferredWidth(anchos[i]);
         }
@@ -119,7 +119,7 @@ public class PanelDespacho extends JPanel {
         flota = (List<Ubicacion>) r.getDatos();
         for (Ubicacion u : flota) {
             modelo.addRow(new Object[]{u.nombre, u.placaBus.isEmpty() ? "—" : u.placaBus, u.situacion, u.dondeEsta,
-                    u.ultimoDestino.isEmpty() ? "—" : u.ultimoDestino, u.proximoOrigen.isEmpty() ? "—" : u.proximoOrigen,
+                    u.ultimoViaje, u.proximoOrigen.isEmpty() ? "—" : u.proximoOrigen,
                     u.disponibleDesde.format(FORMATO), u.porAceptar, u.programados});
         }
         modeloAvisos.setRowCount(0);

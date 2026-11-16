@@ -404,6 +404,10 @@ public class DialogoFormularioViaje extends JDialog {
      * asignación no se le puede programar un viaje.
      */
     private void autocompletarPorConductor() {
+        if (this.viaje == null && this.cmbConductor1.getSelectedIndex() <= 0) {
+            this.cmbOrigen.setEnabled(true);
+            this.cmbOrigen.setToolTipText(null);
+        }
         if (this.viaje != null || this.cmbConductor1.getSelectedIndex() <= 0 || this.cmbConductor1.getSelectedItem() == null) {
             return;
         }
@@ -424,11 +428,25 @@ public class DialogoFormularioViaje extends JDialog {
             }
             this.busSeleccionadoObj = bus;
             this.txtBus.setText(bus.getPlaca() + " - " + bus.getMarca());
-            this.cmbOrigen.setSelectedItem(ruta.getOrigen());
-            this.cmbDestino.setSelectedItem(ruta.getDestino());
-            this.rutaSeleccionadaObj = ruta;
+            // el viaje sale desde donde terminó el último viaje del conductor (o desde su base si aún no ha viajado)
+            Conductor cond = new Conductor(idConductor);
+            for (Conductor c : this.conductores) {
+                if (c.getIdConductor().equals(idConductor)) {
+                    cond = c;
+                }
+            }
+            control.ControladorSimulacion.Ubicacion ubic = new control.ControladorSimulacion().ubicacionDe(cond);
+            String origen = ubic.proximoOrigen.isEmpty() ? ruta.getOrigen() : ubic.proximoOrigen;
+            if (this.empresaSeleccionadaObj != null) {
+                new control.ControladorDespacho().rutasDesde(origen, this.empresaSeleccionadaObj.getIdEmpresa());
+                this.rutas = new Rutas("rutas.dat").lista();
+                this.cargarOrigenes();
+            }
+            this.cmbOrigen.setSelectedItem(origen);
+            this.cmbOrigen.setEnabled(false);
+            this.cmbOrigen.setToolTipText("Último viaje del conductor: " + ubic.ultimoViaje + ". El siguiente sale desde donde terminó.");
+            this.rutaSeleccionadaObj = null;
             this.actualizarCapacidadBus();
-            this.calcularLlegada();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "No se pudo cargar el bus y la ruta del conductor: " + ex.getMessage());
         }

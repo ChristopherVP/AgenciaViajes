@@ -98,6 +98,9 @@ public class DialogoInformes extends JDialog {
         marcarTodo.addActionListener(e -> marcas.values().forEach(c -> c.setSelected(true)));
         JButton limpiar = Tema.boton("Quitar marcas", false);
         limpiar.addActionListener(e -> marcas.values().forEach(c -> c.setSelected(false)));
+        JButton porPeriodo = Tema.boton("Informe de viajes por periodo", true);
+        porPeriodo.setEnabled(objetosServicio.Permisos.puedeVer(usuario, objetosServicio.Permisos.Modulo.VIAJES));
+        porPeriodo.addActionListener(e -> new DialogoInformeViajes(this, usuario).setVisible(true));
         JButton cerrar = Tema.boton("Cerrar", false);
         cerrar.addActionListener(e -> dispose());
 
@@ -107,6 +110,7 @@ public class DialogoInformes extends JDialog {
         botones.add(limpiar);
         botones.add(marcadas);
         botones.add(todo);
+        botones.add(porPeriodo);
         botones.add(cerrar);
         JLabel nota = Tema.nota(620, "<html>Cada informe incluye portada, índice, resumen con gráficos y las tablas con los datos. "
                 + "El <b>informe completo</b> reúne todas las secciones que tu cargo puede ver.</html>");

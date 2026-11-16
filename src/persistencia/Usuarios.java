@@ -1,81 +1,52 @@
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import objetosNegocio.Cargo;
 import objetosNegocio.Empresa;
 import objetosNegocio.Rol;
 import objetosNegocio.Usuario;
 import objetosServicio.Seguridad;
 
-/**
- * Persistencia de usuarios en archivo de acceso aleatorio (registro fijo).
- * Formato v2: id, login, nombre, cédula, hash de clave, email, teléfono, tipo, fecha, empresa, estado,
- * pregunta, hash de respuesta, idPerfil, intentos de recuperación y bloqueo.
- */
-public class Usuarios extends AccesoAleatorio {
-    private static final int CARACTERES = 10 + 20 + 50 + 15 + 80 + 50 + 20 + 20 + 10 + 20 + 80 + 80 + 10 + Cargo.LONGITUD_MAXIMA;
-    /** Fecha (12) + intentos (4) + bloqueo (8) + clave pendiente (4). */
-    public static final int TAM_REGISTRO = CARACTERES * 2 + 12 + 4 + 8 + 4;
+/** Usuarios del sistema en la tabla USUARIOS de Oracle. Las contraseñas se guardan siempre como hash. */
+public class Usuarios {
+    private static final String COLUMNAS = "ID_USUARIO, LOGIN, NOMBRE, CEDULA, CONTRASENA, EMAIL, TELEFONO, TIPO, FECHA_REGISTRO, ID_EMPRESA, ESTADO, "
+            + "PREGUNTA_SEGURIDAD, RESPUESTA_SEGURIDAD, ID_PERFIL, CARGO, INTENTOS_RECUPERACION, BLOQUEO_HASTA, CLAVE_PENDIENTE";
 
-    public Usuarios(String nomArchivo) {
-        super(nomArchivo, TAM_REGISTRO);
+    public Usuarios(String ignorado) {
     }
 
-    private Usuario leeUsuario() throws IOException {
+    private static Usuario mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
         Usuario u = new Usuario();
-        u.setIdUsuario(leeString(10));
-        u.setLogin(leeString(20));
-        u.setNombre(leeString(50));
-        u.setCedula(leeString(15));
-        u.setContrasena(leeString(80));
-        u.setEmail(leeString(50));
-        u.setTelefono(leeString(20));
-        u.setTipo(leeString(20));
-        u.setFechaRegistro(leeFecha());
-        String idEmpresa = leeString(10);
+        u.setIdUsuario(Bd.texto(rs, "ID_USUARIO"));
+        u.setLogin(Bd.texto(rs, "LOGIN"));
+        u.setNombre(Bd.texto(rs, "NOMBRE"));
+        u.setCedula(Bd.texto(rs, "CEDULA"));
+        u.setContrasena(Bd.texto(rs, "CONTRASENA"));
+        u.setEmail(Bd.texto(rs, "EMAIL"));
+        u.setTelefono(Bd.texto(rs, "TELEFONO"));
+        u.setTipo(Bd.texto(rs, "TIPO"));
+        u.setFechaRegistro(Bd.fecha(rs, "FECHA_REGISTRO"));
+        String idEmpresa = Bd.texto(rs, "ID_EMPRESA");
         u.setEmpresa(idEmpresa.isEmpty() ? null : new Empresa(idEmpresa));
-        u.setEstado(leeString(20));
-        u.setPreguntaSeguridad(leeString(80));
-        u.setRespuestaSeguridad(leeString(80));
-        u.setIdPerfil(leeString(10));
-        u.setCargo(leeString(Cargo.LONGITUD_MAXIMA));
-        u.setIntentosRecuperacion(archivo.readInt());
-        u.setBloqueoHasta(archivo.readLong());
-        u.setClavePendiente(archivo.readInt() == 1);
+        u.setEstado(Bd.texto(rs, "ESTADO"));
+        u.setPreguntaSeguridad(Bd.texto(rs, "PREGUNTA_SEGURIDAD"));
+        u.setRespuestaSeguridad(Bd.texto(rs, "RESPUESTA_SEGURIDAD"));
+        u.setIdPerfil(Bd.texto(rs, "ID_PERFIL"));
+        u.setCargo(Bd.texto(rs, "CARGO"));
+        u.setIntentosRecuperacion(rs.getInt("INTENTOS_RECUPERACION"));
+        u.setBloqueoHasta(rs.getLong("BLOQUEO_HASTA"));
+        u.setClavePendiente(rs.getInt("CLAVE_PENDIENTE") == 1);
         return u;
     }
 
-    private void escribeUsuario(Usuario u) throws IOException {
-        escribeString(u.getIdUsuario(), 10);
-        escribeString(u.getLogin(), 20);
-        escribeString(u.getNombre(), 50);
-        escribeString(u.getCedula(), 15);
-        escribeString(u.getContrasena(), 80);
-        escribeString(u.getEmail(), 50);
-        escribeString(u.getTelefono(), 20);
-        escribeString(u.getTipo(), 20);
-        escribeFecha(u.getFechaRegistro());
-        escribeString(u.tieneEmpresa() ? u.getEmpresa().getIdEmpresa() : "", 10);
-        escribeString(u.getEstado(), 20);
-        escribeString(u.getPreguntaSeguridad(), 80);
-        escribeString(u.getRespuestaSeguridad(), 80);
-        escribeString(u.getIdPerfil(), 10);
-        escribeString(u.getCargo(), Cargo.LONGITUD_MAXIMA);
-        archivo.writeInt(u.getIntentosRecuperacion());
-        archivo.writeLong(u.getBloqueoHasta());
-        archivo.writeInt(u.isClavePendiente() ? 1 : 0);
+    private static Object[] valores(String id, Usuario u) {
+        return new Object[]{id, u.getLogin(), u.getNombre(), u.getCedula(), u.getContrasena(), u.getEmail(), u.getTelefono(), u.getTipo(),
+                u.getFechaRegistro(), u.tieneEmpresa() ? u.getEmpresa().getIdEmpresa() : "", u.getEstado(), u.getPreguntaSeguridad(),
+                u.getRespuestaSeguridad(), u.getIdPerfil(), u.getCargo(), u.getIntentosRecuperacion(), u.getBloqueoHasta(), u.isClavePendiente()};
     }
 
-    private static boolean esValido(Usuario u) {
-        return u != null && u.getIdUsuario() != null && !u.getIdUsuario().trim().isEmpty();
-    }
-
-    /** Validación estructural del registro (las reglas de negocio finas están en ControladorUsuarios). */
     private void validar(Usuario u) throws PersistenciaException {
         if (u.getLogin() == null || u.getLogin().trim().isEmpty()) {
             throw new PersistenciaException("El nombre de usuario es obligatorio");
@@ -107,59 +78,19 @@ public class Usuarios extends AccesoAleatorio {
         }
     }
 
-    private String siguienteId(List<Usuario> existentes) {
-        int max = 0;
-        for (Usuario u : existentes) {
-            String id = u.getIdUsuario();
-            if (id.startsWith("USU") && id.length() > 3) {
-                try {
-                    max = Math.max(max, Integer.parseInt(id.substring(3)));
-                } catch (NumberFormatException ignorado) {
-                    // ids con otro formato no participan del correlativo
-                }
-            }
-        }
-        return String.format("USU%03d", max + 1);
-    }
-
     public synchronized void agrega(Usuario usuario) throws PersistenciaException {
         validar(usuario);
-        usuario.setIdUsuario(siguienteId(lista()));
-        escribeAlFinal(usuario);
+        Bd.insertarConCodigo("USUARIOS", "ID_USUARIO", "USU", 3, usuario::setIdUsuario,
+                "INSERT INTO USUARIOS (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", id -> valores(id, usuario));
     }
 
-    /** Agrega conservando el id recibido (migraciones). */
+    /** Agrega conservando el id recibido. */
     public synchronized void importa(Usuario usuario) throws PersistenciaException {
         validar(usuario);
-        if (!esValido(usuario)) {
+        if (usuario.getIdUsuario() == null || usuario.getIdUsuario().trim().isEmpty()) {
             throw new PersistenciaException("El usuario importado necesita un id");
         }
-        escribeAlFinal(usuario);
-    }
-
-    private void escribeAlFinal(Usuario usuario) throws PersistenciaException {
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "rw")) {
-            archivo = raf;
-            raf.seek(raf.length());
-            escribeUsuario(usuario);
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al guardar el usuario", e);
-        } finally {
-            archivo = null;
-        }
-    }
-
-    private long posicionDe(RandomAccessFile raf, String idUsuario) throws IOException {
-        long total = raf.length() / TAM_REGISTRO;
-        for (long i = 0; i < total; i++) {
-            long pos = i * TAM_REGISTRO;
-            raf.seek(pos);
-            Usuario u = leeUsuario();
-            if (esValido(u) && u.getIdUsuario().equals(idUsuario)) {
-                return pos;
-            }
-        }
-        return -1;
+        Bd.actualizar("INSERT INTO USUARIOS (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", valores(usuario.getIdUsuario(), usuario));
     }
 
     public synchronized Usuario obten(Usuario usuario) throws PersistenciaException {
@@ -170,91 +101,46 @@ public class Usuarios extends AccesoAleatorio {
     }
 
     public synchronized Usuario obtenPorIdUsuario(String idUsuario) throws PersistenciaException {
-        for (Usuario u : lista()) {
-            if (u.getIdUsuario().equals(idUsuario)) {
-                return u;
-            }
-        }
-        return null;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM USUARIOS WHERE ID_USUARIO = ?", Usuarios::mapear, idUsuario);
     }
 
     public synchronized Usuario buscaPorLogin(String login) throws PersistenciaException {
         if (login == null) {
             return null;
         }
-        for (Usuario u : lista()) {
-            if (u.getLogin() != null && u.getLogin().equalsIgnoreCase(login.trim())) {
-                return u;
-            }
-        }
-        return null;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM USUARIOS WHERE UPPER(LOGIN) = UPPER(?)", Usuarios::mapear, login.trim());
     }
 
     public synchronized Usuario buscaPorCedula(String cedula) throws PersistenciaException {
         if (cedula == null) {
             return null;
         }
-        for (Usuario u : lista()) {
-            if (cedula.trim().equals(u.getCedula())) {
-                return u;
-            }
-        }
-        return null;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM USUARIOS WHERE CEDULA = ? ORDER BY ID_USUARIO", Usuarios::mapear, cedula.trim());
     }
 
-    public synchronized void actualiza(Usuario usuario) throws PersistenciaException {
-        validar(usuario);
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "rw")) {
-            archivo = raf;
-            long pos = posicionDe(raf, usuario.getIdUsuario());
-            if (pos < 0) {
-                throw new PersistenciaException("Usuario no encontrado: " + usuario.getIdUsuario());
-            }
-            raf.seek(pos);
-            escribeUsuario(usuario);
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al actualizar el usuario", e);
-        } finally {
-            archivo = null;
+    public synchronized void actualiza(Usuario u) throws PersistenciaException {
+        validar(u);
+        int n = Bd.actualizar("UPDATE USUARIOS SET LOGIN=?, NOMBRE=?, CEDULA=?, CONTRASENA=?, EMAIL=?, TELEFONO=?, TIPO=?, FECHA_REGISTRO=?, ID_EMPRESA=?, ESTADO=?, "
+                        + "PREGUNTA_SEGURIDAD=?, RESPUESTA_SEGURIDAD=?, ID_PERFIL=?, CARGO=?, INTENTOS_RECUPERACION=?, BLOQUEO_HASTA=?, CLAVE_PENDIENTE=? WHERE ID_USUARIO=?",
+                u.getLogin(), u.getNombre(), u.getCedula(), u.getContrasena(), u.getEmail(), u.getTelefono(), u.getTipo(), u.getFechaRegistro(),
+                u.tieneEmpresa() ? u.getEmpresa().getIdEmpresa() : "", u.getEstado(), u.getPreguntaSeguridad(), u.getRespuestaSeguridad(),
+                u.getIdPerfil(), u.getCargo(), u.getIntentosRecuperacion(), u.getBloqueoHasta(), u.isClavePendiente(), u.getIdUsuario());
+        if (n == 0) {
+            throw new PersistenciaException("Usuario no encontrado: " + u.getIdUsuario());
         }
     }
 
     public synchronized void elimina(Usuario usuario) throws PersistenciaException {
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "rw")) {
-            archivo = raf;
-            long pos = posicionDe(raf, usuario.getIdUsuario());
-            if (pos < 0) {
-                throw new PersistenciaException("Usuario no encontrado: " + usuario.getIdUsuario());
-            }
-            raf.seek(pos);
-            borraRegistro();
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al eliminar el usuario", e);
-        } finally {
-            archivo = null;
+        if (Bd.actualizar("DELETE FROM USUARIOS WHERE ID_USUARIO = ?", usuario.getIdUsuario()) == 0) {
+            throw new PersistenciaException("Usuario no encontrado: " + usuario.getIdUsuario());
         }
     }
 
     public synchronized List<Usuario> lista() throws PersistenciaException {
-        List<Usuario> resultado = new ArrayList<>();
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "r")) {
-            archivo = raf;
-            long total = raf.length() / TAM_REGISTRO;
-            for (long i = 0; i < total; i++) {
-                Usuario u = leeUsuario();
-                if (esValido(u)) {
-                    resultado.add(u);
-                }
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al leer los usuarios", e);
-        } finally {
-            archivo = null;
-        }
-        return resultado;
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM USUARIOS ORDER BY ID_USUARIO", Usuarios::mapear);
     }
 
     public List<Usuario> listaPorTipo(String tipo) throws PersistenciaException {
-        return lista().stream().filter(u -> u.getTipo() != null && u.getTipo().equalsIgnoreCase(tipo)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM USUARIOS WHERE UPPER(TIPO) = UPPER(?) ORDER BY ID_USUARIO", Usuarios::mapear, tipo);
     }
 }

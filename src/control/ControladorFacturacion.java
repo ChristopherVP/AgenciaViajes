@@ -38,6 +38,12 @@ public class ControladorFacturacion {
         /** Pagos a conductores de viajes que ya se aceptaron pero todavía no terminan. */
         public double programadoConductores;
         public int facturas;
+        /** Dinero que la empresa tiene en caja: todo lo que entró por recargas menos lo ya pagado a conductores. */
+        public double cajaEmpresa;
+        /** Parte de la caja que es de los pasajeros (saldo de sus billeteras): se les debe. */
+        public double saldoBilleteras;
+        /** Parte de la caja que es de la empresa una vez descontado lo que se debe a pasajeros y a conductores. */
+        public double dineroPropio;
 
         /** Lo que se queda la plataforma de los viajes ya liquidados (el 20 %). */
         public double margenPlataforma;
@@ -230,6 +236,23 @@ public class ControladorFacturacion {
         } catch (IOException e) {
             System.err.println("No se pudo calcular el resumen: " + e.getMessage());
         }
+        try {
+            for (Movimiento m : new persistencia.Movimientos("movimientos.dat").lista()) {
+                if (!Movimiento.APROBADA.equals(m.getEstado())) {
+                    continue;
+                }
+                if (Movimiento.RECARGA.equals(m.getTipo()) || Movimiento.REEMBOLSO.equals(m.getTipo())) {
+                    r.saldoBilleteras += m.getMonto();
+                } else if (Movimiento.COMPRA.equals(m.getTipo())) {
+                    r.saldoBilleteras -= m.getMonto();
+                }
+            }
+        } catch (excepciones.PersistenciaException e) {
+            System.err.println("No se pudo calcular el saldo de las billeteras: " + e.getMessage());
+        }
+        r.cajaEmpresa = Math.round((r.recargasAcreditadas - r.pagadoConductores) * 100) / 100.0;
+        r.saldoBilleteras = Math.round(r.saldoBilleteras * 100) / 100.0;
+        r.dineroPropio = Math.round((r.cajaEmpresa - r.saldoBilleteras - r.porPagarConductores) * 100) / 100.0;
         r.ventasPasajes = Math.round(r.ventasPasajes * 100) / 100.0;
         r.recargasAcreditadas = Math.round(r.recargasAcreditadas * 100) / 100.0;
         r.pagadoConductores = Math.round(r.pagadoConductores * 100) / 100.0;

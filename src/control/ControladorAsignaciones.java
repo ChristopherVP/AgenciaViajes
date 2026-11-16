@@ -8,6 +8,7 @@ import objetosNegocio.Bus;
 import objetosNegocio.Conductor;
 import objetosNegocio.Ruta;
 import objetosNegocio.Usuario;
+import objetosNegocio.Viaje;
 import objetosServicio.Permisos;
 import persistencia.AlmacenTexto;
 import persistencia.Conductores;
@@ -170,6 +171,63 @@ public class ControladorAsignaciones {
             return null;
         } catch (Exception e) {
             return "No se pudo verificar al conductor: " + e.getMessage();
+        }
+    }
+
+    private static String norm(String s) {
+        return s == null ? "" : java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").trim().toUpperCase();
+    }
+
+    /**
+     * Regla de continuidad del conductor: el nuevo viaje debe salir de DONDE TERMINÓ SU ÚLTIMO VIAJE (si no tiene viajes, de la
+     * base de su ruta asignada), no puede salir antes de que ese viaje termine y descanse, y no se puede meter entre viajes que
+     * ya tiene programados. Devuelve null si todo está bien o el mensaje del problema.
+     *
+     * @param idViajeExcluido el viaje que se está editando (para no compararlo consigo mismo), o null si es nuevo
+     */
+    public String errorDeContinuidad(String idConductor, String idRuta, java.time.LocalDateTime salida, String idViajeExcluido) {
+        try {
+            FachadaArchivos fachada = FachadaArchivos.getInstance();
+            Ruta nueva = fachada.obten(new Ruta(idRuta));
+            if (nueva == null || salida == null) {
+                return null;
+            }
+            ControladorSimulacion sim = new ControladorSimulacion();
+            Viaje previo = null;
+            for (Viaje v : fachada.consultaViajes()) {
+                if (v.getIdViaje().equals(idViajeExcluido) || !ControladorNovedades.esConductorDelViaje(v, idConductor)
+                        || ControladorSimulacion.CANCELADO.equalsIgnoreCase(v.getEstado()) || ControladorCompras.salidaDe(v) == null) {
+                    continue;
+                }
+                java.time.LocalDateTime sv = ControladorCompras.salidaDe(v);
+                if (sv.isAfter(salida)) {
+                    return "El conductor ya tiene un viaje posterior (" + v.getIdViaje() + "). Los viajes se asignan en orden, uno detrás de otro.";
+                }
+                if (previo == null || ControladorCompras.llegadaDe(v).isAfter(ControladorCompras.llegadaDe(previo))) {
+                    previo = v;
+                }
+            }
+            String origenEsperado;
+            if (previo != null) {
+                Ruta rp = sim.rutaDe(previo);
+                origenEsperado = rp == null ? "" : rp.getDestino();
+                java.time.LocalDateTime libre = ControladorCompras.llegadaDe(previo).plusMinutes(ControladorSimulacion.MINUTOS_DESCANSO);
+                if (salida.isBefore(libre)) {
+                    return "El conductor recién queda libre el " + libre.format(ControladorLiquidaciones.FECHA) + " (termina el viaje " + previo.getIdViaje()
+                            + " y descansa " + ControladorSimulacion.MINUTOS_DESCANSO + " min).";
+                }
+            } else {
+                Asignacion a = obtener(idConductor);
+                Ruta base = a == null ? null : fachada.obten(new Ruta(a.getIdRuta()));
+                origenEsperado = base == null ? "" : base.getOrigen();
+            }
+            if (!origenEsperado.isEmpty() && !norm(origenEsperado).equals(norm(nueva.getOrigen()))) {
+                return "El conductor estará en " + origenEsperado + " (donde termina su " + (previo != null ? "último viaje" : "ruta base")
+                        + "): el siguiente viaje debe salir de " + origenEsperado + ", no de " + nueva.getOrigen() + ".";
+            }
+            return null;
+        } catch (Exception e) {
+            return "No se pudo verificar la continuidad del conductor: " + e.getMessage();
         }
     }
 }

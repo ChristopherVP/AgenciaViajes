@@ -19,8 +19,8 @@ import persistencia.Rutas;
 import persistencia.Viajes;
 
 /**
- * Datos de demostración escritos en el propio código: empresas, buses, rutas, conductores y viajes.
- * Se cargan UNA sola vez, cuando el archivo de empresas está vacío (primer arranque o tras borrar los .dat).
+ * Datos iniciales escritos en el propio código: empresas, buses, rutas, conductores y viajes.
+ * Se cargan UNA sola vez (primer arranque o tras restablecer el sistema).
  * Si ya hay empresas registradas no se toca nada, así nunca se pisan los datos del usuario.
  */
 public final class DatosIniciales {
@@ -138,6 +138,16 @@ public final class DatosIniciales {
             Conductor conductor = conductores.get(i % conductores.size());
             Bus bus = buses.get(i % conductores.size());
             Ruta ruta = rutas.get(i % conductores.size());
+            // cada conductor alterna ida y vuelta: sale desde donde terminó su viaje anterior
+            if ((i / conductores.size()) % 2 == 1) {
+                final Ruta ida = ruta;
+                Ruta vuelta = new ControladorDespacho().rutasDesde(ida.getDestino(), empresa.getIdEmpresa()).stream()
+                        .filter(r -> r.getDestino().equalsIgnoreCase(ida.getOrigen())).findFirst().orElse(null);
+                if (vuelta == null) {
+                    throw new PersistenciaException("No se pudo crear la ruta de regreso " + ida.getDestino() + " > " + ida.getOrigen());
+                }
+                ruta = vuelta;
+            }
             String hora = HORAS[(i + desplazamientoHora) % HORAS.length];
             LocalDateTime salida = LocalDate.now().plusDays(1L + i).atTime(Integer.parseInt(hora.substring(0, 2)), Integer.parseInt(hora.substring(3)));
             LocalDateTime llegada = salida.plusMinutes(Math.round(ruta.getTiempoEstimado() * 60));

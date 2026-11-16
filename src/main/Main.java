@@ -15,6 +15,7 @@ public class Main {
             SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(null,
                     "Ocurrió un error inesperado:\n" + error, objetosServicio.Marca.NOMBRE, JOptionPane.ERROR_MESSAGE));
         });
+        DB.ConexionOracle.precalentar();
         SwingUtilities.invokeLater(() -> {
             Tema.aplicarAspecto();
             try {
@@ -26,7 +27,18 @@ public class Main {
             }
             new SplashScreen(Navegador::iniciar).iniciar();
             // Reloj de la simulación: salidas, llegadas y cancelaciones por falta de aceptación se aplican solos.
-            new javax.swing.Timer(15000, e -> new control.ControladorSimulacion().avanzar()).start();
+            java.util.concurrent.ScheduledExecutorService reloj = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "reloj-simulacion");
+                t.setDaemon(true);
+                return t;
+            });
+            reloj.scheduleWithFixedDelay(() -> {
+                try {
+                    new control.ControladorSimulacion().avanzar();
+                } catch (RuntimeException ex) {
+                    System.err.println("Reloj de simulación: " + ex.getMessage());
+                }
+            }, 20, 15, java.util.concurrent.TimeUnit.SECONDS);
         });
     }
 }

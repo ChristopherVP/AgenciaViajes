@@ -1,24 +1,22 @@
 package control;
 
+import DB.Bd;
+import DB.EsquemaOracle;
 import excepciones.PersistenciaException;
-import fachadas.FachadaArchivos;
-import java.io.File;
-import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
-import persistencia.Conductores;
-import persistencia.Empresas;
-import persistencia.Movimientos;
-import persistencia.Novedades;
-import persistencia.Pasajeros;
-import persistencia.Usuarios;
 
 /**
- * Prepara los datos al arrancar. NUNCA borra información existente: crea los archivos que falten, asegura la cuenta
- * del administrador principal, hace un respaldo de lo que ya existía y, solo si el sistema está vacío, carga los
- * datos de demostración definidos en {@link DatosIniciales}.
+ * Prepara el sistema al arrancar, lo más rápido posible:
+ * 1) comprueba las tablas de Oracle (una sola consulta; solo las crea la primera vez o si hay una migración nueva),
+ * 2) asegura la cuenta del administrador principal,
+ * 3) la PRIMERA vez carga los datos iniciales (empresas, buses, rutas, conductores y viajes). Queda marcado en la tabla
+ *    CONFIGURACION y no vuelve a ejecutarse, así nunca se pisan los datos que crees.
+ * NUNCA borra información existente.
  */
 public final class InicializadorSistema {
+    private static final String CLAVE_DATOS_INICIALES = "DATOS_INICIALES";
 
     public interface Progreso {
         void avance(int porcentaje, String mensaje);
@@ -27,7 +25,6 @@ public final class InicializadorSistema {
     public static class Resumen {
         public boolean administradorCreado;
         public int viajesCreados;
-        public String carpetaRespaldo;
         public final List<String> advertencias = new ArrayList<>();
     }
 
@@ -36,24 +33,14 @@ public final class InicializadorSistema {
 
     public static Resumen preparar(Progreso progreso) {
         Resumen resumen = new Resumen();
-        notificar(progreso, 10, "Verificando archivos de datos...");
-        new Empresas("empresas.dat");
-        new Pasajeros("pasajeros.dat");
-        new Conductores("conductores.dat");
-        new Movimientos("movimientos.dat");
-        new Novedades("novedades.dat");
-        new Usuarios("usuarios.dat");
-        FachadaArchivos.getInstance();
-
-        notificar(progreso, 30, "Creando respaldo de seguridad de tus datos...");
+        notificar(progreso, 15, "Conectando con la base de datos...");
         try {
-            File carpeta = hayDatosGuardados() ? RespaldoDatos.respaldar(new File(".")) : null;
-            resumen.carpetaRespaldo = carpeta == null ? null : carpeta.getPath();
-        } catch (IOException e) {
-            resumen.advertencias.add("Respaldo: " + e.getMessage());
+            EsquemaOracle.asegurar();
+        } catch (SQLException e) {
+            throw new IllegalStateException("No se pudo preparar la base de datos Oracle: " + e.getMessage(), e);
         }
 
-        notificar(progreso, 50, "Preparando la cuenta del administrador principal...");
+        notificar(progreso, 55, "Verificando el administrador principal...");
         ResultadoOperacion admin = new ControladorUsuarios().asegurarAdministradorPrincipal();
         if (!admin.isExito()) {
             resumen.advertencias.add("Administrador principal: " + admin.getMensaje());
@@ -61,35 +48,35 @@ public final class InicializadorSistema {
             resumen.administradorCreado = admin.getMensaje().startsWith("Administrador principal creado");
         }
 
-        notificar(progreso, 70, "Cargando datos iniciales...");
         try {
-            resumen.viajesCreados = DatosIniciales.sembrarSiHaceFalta();
+            if (!datosInicialesYaCargados()) {
+                notificar(progreso, 70, "Cargando datos iniciales (solo la primera vez)...");
+                resumen.viajesCreados = DatosIniciales.sembrarSiHaceFalta();
+                Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_DATOS_INICIALES, "1");
+            }
         } catch (PersistenciaException e) {
             resumen.advertencias.add("Datos iniciales: " + e.getMessage());
-        }
-        new ControladorReservas().migrarPendientesDePago();
-        notificar(progreso, 85, "Cargando pasajeros, facturas y pagos de ejemplo...");
-        try {
-            DatosDemostracion.sembrarSiHaceFalta();
-        } catch (RuntimeException e) {
-            resumen.advertencias.add("Datos de demostración: " + e.getMessage());
         }
         notificar(progreso, 100, "Todo listo");
         return resumen;
     }
 
-    /** true si algún archivo .dat ya tiene información (no tiene sentido respaldar archivos vacíos). */
-    private static boolean hayDatosGuardados() {
-        File[] datos = new File(".").listFiles((d, n) -> n.endsWith(".dat"));
-        if (datos == null) {
-            return false;
+    private static boolean datosInicialesYaCargados() throws PersistenciaException {
+        return Bd.uno("SELECT VALOR FROM CONFIGURACION WHERE CLAVE = ?", rs -> rs.getString(1), CLAVE_DATOS_INICIALES) != null;
+    }
+
+    /** Quita la marca de "datos iniciales cargados" (la usa la herramienta de restablecimiento antes de volver a sembrar). */
+    public static void olvidarDatosIniciales() throws PersistenciaException {
+        Bd.actualizar("DELETE FROM CONFIGURACION WHERE CLAVE = ?", CLAVE_DATOS_INICIALES);
+    }
+
+    /** Siembra los datos iniciales y deja la marca (la usa la herramienta de restablecimiento). */
+    public static int sembrarDatosIniciales() throws PersistenciaException {
+        int viajes = DatosIniciales.sembrarSiHaceFalta();
+        if (!datosInicialesYaCargados()) {
+            Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_DATOS_INICIALES, "1");
         }
-        for (File f : datos) {
-            if (f.length() > 0) {
-                return true;
-            }
-        }
-        return false;
+        return viajes;
     }
 
     private static void notificar(Progreso progreso, int porcentaje, String mensaje) {

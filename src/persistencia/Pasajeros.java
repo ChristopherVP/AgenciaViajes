@@ -1,236 +1,78 @@
-//
-// Source code recreated from a .class file by IntelliJ IDEA
-// (powered by FernFlower decompiler)
-//
-
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
 import excepciones.Validador;
-import java.io.EOFException;
-import java.io.File;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import objetosNegocio.Empresa;
 import objetosNegocio.Pasajero;
 
-public class Pasajeros extends AccesoAleatorio {
-    public Pasajeros(String nomArchivo) {
-        super(nomArchivo, 470);
+/** Pasajeros en la tabla PASAJEROS de Oracle. */
+public class Pasajeros {
+    private static final String COLUMNAS = "ID_PASAJERO, NOMBRE, CEDULA, TELEFONO, EMAIL, DIRECCION, ID_EMPRESA, FECHA_NACIMIENTO, DISCAPACIDAD";
+
+    public Pasajeros(String ignorado) {
     }
 
-    private Pasajero leePasajero() throws IOException {
-        Pasajero pasajero = new Pasajero();
-        pasajero.setIdPasajero(this.leeString(10));
-        pasajero.setNombre(this.leeString(50));
-        pasajero.setCedula(this.leeString(10));
-        pasajero.setTelefono(this.leeString(15));
-        pasajero.setEmail(this.leeString(50));
-        pasajero.setDireccion(this.leeString(80));
-        pasajero.setEmpresa(new Empresa(this.leeString(10)));
-        pasajero.setFechaNacimiento(this.leeFecha());
-        pasajero.setDiscapacidad(this.archivo.readBoolean());
-        return pasajero;
+    private static Pasajero mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
+        Pasajero p = new Pasajero();
+        p.setIdPasajero(Bd.texto(rs, "ID_PASAJERO"));
+        p.setNombre(Bd.texto(rs, "NOMBRE"));
+        p.setCedula(Bd.texto(rs, "CEDULA"));
+        p.setTelefono(Bd.texto(rs, "TELEFONO"));
+        p.setEmail(Bd.texto(rs, "EMAIL"));
+        p.setDireccion(Bd.texto(rs, "DIRECCION"));
+        p.setEmpresa(new Empresa(Bd.texto(rs, "ID_EMPRESA")));
+        p.setFechaNacimiento(Bd.fecha(rs, "FECHA_NACIMIENTO"));
+        p.setDiscapacidad(Bd.logico(rs, "DISCAPACIDAD"));
+        return p;
     }
 
-    private void escribePasajero(Pasajero pasajero) throws IOException {
-        this.escribeString(pasajero.getIdPasajero(), 10);
-        this.escribeString(pasajero.getNombre(), 50);
-        this.escribeString(pasajero.getCedula(), 10);
-        this.escribeString(pasajero.getTelefono(), 15);
-        this.escribeString(pasajero.getEmail(), 50);
-        this.escribeString(pasajero.getDireccion(), 80);
-        String idEmpresa = pasajero.getEmpresa() != null ? pasajero.getEmpresa().getIdEmpresa() : "";
-        this.escribeString(idEmpresa, 10);
-        this.escribeFecha(pasajero.getFechaNacimiento());
-        this.archivo.writeBoolean(pasajero.isDiscapacidad());
+    private static String idEmpresa(Pasajero p) {
+        return p.getEmpresa() != null ? p.getEmpresa().getIdEmpresa() : "";
     }
 
-    private boolean esPasajeroValido(Pasajero pasajero) {
-        return pasajero != null && pasajero.getIdPasajero() != null && !pasajero.getIdPasajero().trim().isEmpty();
-    }
-
-    private String generarId() throws PersistenciaException {
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-            int max = 0;
-
-            try {
-                while(true) {
-                    Pasajero p = this.leePasajero();
-                    if (this.esPasajeroValido(p) && p.getIdPasajero().startsWith("PAS")) {
-                        try {
-                            int num = Integer.parseInt(p.getIdPasajero().substring(3));
-                            if (num > max) {
-                                max = num;
-                            }
-                        } catch (NumberFormatException var4) {
-                        }
-                    }
-                }
-            } catch (EOFException var5) {
-                this.archivo.close();
-                return String.format("PAS%03d", max + 1);
-            }
-        } catch (IOException var6) {
-            return "PAS001";
-        }
-    }
-
-    public void agrega(Pasajero pasajero) throws PersistenciaException {
-        pasajero.setIdPasajero(this.generarId());
-        if (Validador.validarNoVacio(pasajero.getNombre())) {
-            try {
-                this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
-                this.archivo.seek(this.archivo.length());
-                this.escribePasajero(pasajero);
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al agregar pasajero", e);
-            } finally {
-                this.cerrar();
-            }
-
-        } else {
+    private static void validar(Pasajero p) throws PersistenciaException {
+        if (!Validador.validarNoVacio(p.getNombre())) {
             throw new PersistenciaException("El nombre del pasajero es obligatorio");
         }
     }
 
-    public Pasajero obten(Pasajero pBusqueda) throws PersistenciaException {
-        Pasajero var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            Pasajero p;
-            do {
-                p = this.leePasajero();
-            } while(!this.esPasajeroValido(p) || !p.getIdPasajero().equals(pBusqueda.getIdPasajero()));
-
-            var3 = p;
-            return var3;
-        } catch (EOFException var8) {
-            var3 = null;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al leer pasajero", e);
-        } finally {
-            this.cerrar();
-        }
-
-        return var3;
+    public void agrega(Pasajero p) throws PersistenciaException {
+        validar(p);
+        Bd.insertarConCodigo("PASAJEROS", "ID_PASAJERO", "PAS", 3, p::setIdPasajero,
+                "INSERT INTO PASAJEROS (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?)",
+                id -> new Object[]{id, p.getNombre(), p.getCedula(), p.getTelefono(), p.getEmail(), p.getDireccion(), idEmpresa(p),
+                        p.getFechaNacimiento(), p.isDiscapacidad()});
     }
 
-    public void actualiza(Pasajero pActualizar) throws PersistenciaException {
-        if (Validador.validarNoVacio(pActualizar.getNombre())) {
-            try {
-                this.archivo = new RandomAccessFile(this.nomArchivo, "rw");
+    public Pasajero obten(Pasajero busqueda) throws PersistenciaException {
+        if (busqueda == null || busqueda.getIdPasajero() == null || busqueda.getIdPasajero().isEmpty()) {
+            return null;
+        }
+        return Bd.uno("SELECT " + COLUMNAS + " FROM PASAJEROS WHERE ID_PASAJERO = ?", Pasajeros::mapear, busqueda.getIdPasajero());
+    }
 
-                long pos;
-                Pasajero p;
-                do {
-                    pos = this.archivo.getFilePointer();
-                    p = this.leePasajero();
-                } while(!this.esPasajeroValido(p) || !p.getIdPasajero().equals(pActualizar.getIdPasajero()));
-
-                this.archivo.seek(pos);
-                this.escribePasajero(pActualizar);
-            } catch (IOException e) {
-                throw new PersistenciaException("Error al actualizar pasajero", e);
-            } finally {
-                this.cerrar();
-            }
-
-        } else {
-            throw new PersistenciaException("El nombre del pasajero es obligatorio");
+    public void actualiza(Pasajero p) throws PersistenciaException {
+        validar(p);
+        int n = Bd.actualizar("UPDATE PASAJEROS SET NOMBRE=?, CEDULA=?, TELEFONO=?, EMAIL=?, DIRECCION=?, ID_EMPRESA=?, FECHA_NACIMIENTO=?, DISCAPACIDAD=? WHERE ID_PASAJERO=?",
+                p.getNombre(), p.getCedula(), p.getTelefono(), p.getEmail(), p.getDireccion(), idEmpresa(p), p.getFechaNacimiento(), p.isDiscapacidad(), p.getIdPasajero());
+        if (n == 0) {
+            throw new PersistenciaException("El pasajero no existe");
         }
     }
 
-    public void elimina(Pasajero pEliminar) throws PersistenciaException {
-        File original = new File(this.nomArchivo);
-        File temp = new File(this.nomArchivo + ".tmp");
-
-        try {
-            this.archivo = new RandomAccessFile(original, "r");
-            List<Pasajero> todos = new ArrayList();
-            boolean encontrado = false;
-
-            try {
-                while(true) {
-                    Pasajero p = this.leePasajero();
-                    if (this.esPasajeroValido(p)) {
-                        if (!p.getIdPasajero().equals(pEliminar.getIdPasajero())) {
-                            todos.add(p);
-                        } else {
-                            encontrado = true;
-                        }
-                    }
-                }
-            } catch (EOFException var8) {
-                this.archivo.close();
-                this.archivo = null;
-                if (!encontrado) {
-                    throw new PersistenciaException("El pasajero no existe");
-                } else {
-                    this.archivo = new RandomAccessFile(temp, "rw");
-
-                    for(Pasajero p : todos) {
-                        this.escribePasajero(p);
-                    }
-
-                    this.archivo.close();
-                    this.archivo = null;
-                    if (!original.delete()) {
-                        throw new PersistenciaException("No se pudo eliminar el archivo original");
-                    } else if (!temp.renameTo(original)) {
-                        throw new PersistenciaException("No se pudo renombrar el archivo temporal");
-                    }
-                }
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al eliminar", e);
+    public void elimina(Pasajero p) throws PersistenciaException {
+        if (Bd.actualizar("DELETE FROM PASAJEROS WHERE ID_PASAJERO = ?", p.getIdPasajero()) == 0) {
+            throw new PersistenciaException("El pasajero no existe");
         }
     }
 
     public List<Pasajero> lista() throws PersistenciaException {
-        List<Pasajero> lista = new ArrayList();
-
-        Object var3;
-        try {
-            this.archivo = new RandomAccessFile(this.nomArchivo, "r");
-
-            while(true) {
-                Pasajero p = this.leePasajero();
-                if (this.esPasajeroValido(p)) {
-                    lista.add(p);
-                }
-            }
-        } catch (EOFException var8) {
-            var3 = lista;
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al listar", e);
-        } finally {
-            this.cerrar();
-        }
-
-        return (List<Pasajero>)var3;
-    }
-
-    private void cerrar() {
-        try {
-            if (this.archivo != null) {
-                this.archivo.close();
-            }
-        } catch (IOException var2) {
-        }
-
-    }
-
-    private static boolean esPasajeroDeEmpresa(Pasajero p, String idEmpresa) {
-        return p.getEmpresa() != null && idEmpresa.equals(p.getEmpresa().getIdEmpresa());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM PASAJEROS ORDER BY ID_PASAJERO", Pasajeros::mapear);
     }
 
     public List<Pasajero> listaPorEmpresa(String idEmpresa) throws PersistenciaException {
-        return (List)this.lista().stream().filter((p) -> esPasajeroDeEmpresa(p, idEmpresa)).collect(Collectors.toList());
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM PASAJEROS WHERE ID_EMPRESA = ? ORDER BY ID_PASAJERO", Pasajeros::mapear, idEmpresa);
     }
 }

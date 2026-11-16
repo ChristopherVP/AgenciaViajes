@@ -1,119 +1,54 @@
 package persistencia;
 
+import DB.Bd;
 import excepciones.PersistenciaException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.ArrayList;
 import java.util.List;
 import objetosNegocio.Novedad;
 
-public class Novedades extends AccesoAleatorio {
-    public static final int TAM_REGISTRO = (10 + 10 + 10 + 20 + 60 + 300 + 8 + 12 + 200 + 10) * 2 + 12;
+/** Novedades, quejas y sugerencias en la tabla NOVEDADES de Oracle. */
+public class Novedades {
+    private static final String COLUMNAS = "ID_NOVEDAD, ID_CONDUCTOR, ID_VIAJE, TIPO, ASUNTO, MENSAJE, FECHA, HORA, ESTADO, RESPUESTA, ID_REVISOR";
 
-    public Novedades(String nomArchivo) {
-        super(nomArchivo, TAM_REGISTRO);
+    public Novedades(String ignorado) {
     }
 
-    private Novedad lee() throws IOException {
+    private static Novedad mapear(java.sql.ResultSet rs) throws java.sql.SQLException {
         Novedad n = new Novedad();
-        n.setIdNovedad(leeString(10));
-        n.setIdConductor(leeString(10));
-        n.setIdViaje(leeString(10));
-        n.setTipo(leeString(20));
-        n.setAsunto(leeString(60));
-        n.setMensaje(leeString(300));
-        n.setFecha(leeFecha());
-        n.setHora(leeString(8));
-        n.setEstado(leeString(12));
-        n.setRespuesta(leeString(200));
-        n.setIdRevisor(leeString(10));
+        n.setIdNovedad(Bd.texto(rs, "ID_NOVEDAD"));
+        n.setIdConductor(Bd.texto(rs, "ID_CONDUCTOR"));
+        n.setIdViaje(Bd.texto(rs, "ID_VIAJE"));
+        n.setTipo(Bd.texto(rs, "TIPO"));
+        n.setAsunto(Bd.texto(rs, "ASUNTO"));
+        n.setMensaje(Bd.texto(rs, "MENSAJE"));
+        n.setFecha(Bd.fecha(rs, "FECHA"));
+        n.setHora(Bd.texto(rs, "HORA"));
+        n.setEstado(Bd.texto(rs, "ESTADO"));
+        n.setRespuesta(Bd.texto(rs, "RESPUESTA"));
+        n.setIdRevisor(Bd.texto(rs, "ID_REVISOR"));
         return n;
     }
 
-    private void escribe(Novedad n) throws IOException {
-        escribeString(n.getIdNovedad(), 10);
-        escribeString(n.getIdConductor(), 10);
-        escribeString(n.getIdViaje(), 10);
-        escribeString(n.getTipo(), 20);
-        escribeString(n.getAsunto(), 60);
-        escribeString(n.getMensaje(), 300);
-        escribeFecha(n.getFecha());
-        escribeString(n.getHora(), 8);
-        escribeString(n.getEstado(), 12);
-        escribeString(n.getRespuesta(), 200);
-        escribeString(n.getIdRevisor(), 10);
-    }
-
     public synchronized void agrega(Novedad n) throws PersistenciaException {
-        int max = 0;
-        for (Novedad x : lista()) {
-            if (x.getIdNovedad().startsWith("NOV")) {
-                try {
-                    max = Math.max(max, Integer.parseInt(x.getIdNovedad().substring(3)));
-                } catch (NumberFormatException ignorado) {
-                    // otro formato de id
-                }
-            }
-        }
-        n.setIdNovedad(String.format("NOV%05d", max + 1));
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "rw")) {
-            archivo = raf;
-            raf.seek(raf.length());
-            escribe(n);
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al guardar la novedad", e);
-        } finally {
-            archivo = null;
-        }
+        Bd.insertarConCodigo("NOVEDADES", "ID_NOVEDAD", "NOV", 5, n::setIdNovedad,
+                "INSERT INTO NOVEDADES (" + COLUMNAS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                id -> new Object[]{id, n.getIdConductor(), n.getIdViaje(), n.getTipo(), n.getAsunto(), n.getMensaje(), n.getFecha(), n.getHora(),
+                        n.getEstado(), n.getRespuesta(), n.getIdRevisor()});
     }
 
     public synchronized void actualiza(Novedad n) throws PersistenciaException {
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "rw")) {
-            archivo = raf;
-            long total = raf.length() / TAM_REGISTRO;
-            for (long i = 0; i < total; i++) {
-                long pos = i * TAM_REGISTRO;
-                raf.seek(pos);
-                Novedad x = lee();
-                if (x.getIdNovedad().equals(n.getIdNovedad())) {
-                    raf.seek(pos);
-                    escribe(n);
-                    return;
-                }
-            }
+        int filas = Bd.actualizar("UPDATE NOVEDADES SET ID_CONDUCTOR=?, ID_VIAJE=?, TIPO=?, ASUNTO=?, MENSAJE=?, FECHA=?, HORA=?, ESTADO=?, RESPUESTA=?, ID_REVISOR=? WHERE ID_NOVEDAD=?",
+                n.getIdConductor(), n.getIdViaje(), n.getTipo(), n.getAsunto(), n.getMensaje(), n.getFecha(), n.getHora(), n.getEstado(),
+                n.getRespuesta(), n.getIdRevisor(), n.getIdNovedad());
+        if (filas == 0) {
             throw new PersistenciaException("Novedad no encontrada: " + n.getIdNovedad());
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al actualizar la novedad", e);
-        } finally {
-            archivo = null;
         }
     }
 
     public synchronized List<Novedad> lista() throws PersistenciaException {
-        List<Novedad> resultado = new ArrayList<>();
-        try (RandomAccessFile raf = new RandomAccessFile(nomArchivo, "r")) {
-            archivo = raf;
-            long total = raf.length() / TAM_REGISTRO;
-            for (long i = 0; i < total; i++) {
-                Novedad n = lee();
-                if (n.getIdNovedad() != null && !n.getIdNovedad().isEmpty()) {
-                    resultado.add(n);
-                }
-            }
-        } catch (IOException e) {
-            throw new PersistenciaException("Error al leer las novedades", e);
-        } finally {
-            archivo = null;
-        }
-        return resultado;
+        return Bd.consultar("SELECT " + COLUMNAS + " FROM NOVEDADES ORDER BY ID_NOVEDAD", Novedades::mapear);
     }
 
     public Novedad obten(String id) throws PersistenciaException {
-        for (Novedad n : lista()) {
-            if (n.getIdNovedad().equals(id)) {
-                return n;
-            }
-        }
-        return null;
+        return Bd.uno("SELECT " + COLUMNAS + " FROM NOVEDADES WHERE ID_NOVEDAD = ?", Novedades::mapear, id);
     }
 }
