@@ -18,6 +18,7 @@ import java.util.List;
 public final class InicializadorSistema {
     private static final String CLAVE_DATOS_INICIALES = "DATOS_INICIALES";
     private static final String CLAVE_PASAJEROS_INICIALES = "PASAJEROS_INICIALES";
+    private static final String CLAVE_COMPLEMENTARIOS = "DATOS_COMPLEMENTARIOS";
 
     public interface Progreso {
         void avance(int porcentaje, String mensaje);
@@ -67,8 +68,29 @@ public final class InicializadorSistema {
         } catch (PersistenciaException | java.io.IOException e) {
             resumen.advertencias.add("Pasajeros iniciales: " + e.getMessage());
         }
+        try {
+            if (!marcaPuesta(CLAVE_COMPLEMENTARIOS)) {
+                notificar(progreso, 92, "Cargando cuentas, reservas, facturas, pagos y novedades (solo la primera vez)...");
+                if (!sembrarComplementarios(resumen.advertencias)) {
+                    resumen.advertencias.add("Datos complementarios incompletos: se reintentará en el próximo arranque");
+                }
+            }
+        } catch (PersistenciaException e) {
+            resumen.advertencias.add("Datos complementarios: " + e.getMessage());
+        }
         notificar(progreso, 100, "Todo listo");
         return resumen;
+    }
+
+    /** Carga cuentas, reservas, facturas, pagos y novedades. Deja la marca solo si todo salió bien (si no, se reintenta). */
+    private static boolean sembrarComplementarios(List<String> advertencias) throws PersistenciaException {
+        DatosComplementarios.Resumen r = DatosComplementarios.sembrar();
+        advertencias.addAll(r.advertencias);
+        if (!r.advertencias.isEmpty()) {
+            return false;
+        }
+        Bd.actualizar("INSERT INTO CONFIGURACION (CLAVE, VALOR) VALUES (?, ?)", CLAVE_COMPLEMENTARIOS, "1");
+        return true;
     }
 
     private static boolean datosInicialesYaCargados() throws PersistenciaException {
@@ -81,7 +103,7 @@ public final class InicializadorSistema {
 
     /** Quita la marca de "datos iniciales cargados" (la usa la herramienta de restablecimiento antes de volver a sembrar). */
     public static void olvidarDatosIniciales() throws PersistenciaException {
-        Bd.actualizar("DELETE FROM CONFIGURACION WHERE CLAVE IN (?, ?)", CLAVE_DATOS_INICIALES, CLAVE_PASAJEROS_INICIALES);
+        Bd.actualizar("DELETE FROM CONFIGURACION WHERE CLAVE IN (?, ?, ?)", CLAVE_DATOS_INICIALES, CLAVE_PASAJEROS_INICIALES, CLAVE_COMPLEMENTARIOS);
     }
 
     /** Siembra los datos iniciales y deja la marca (la usa la herramienta de restablecimiento). */
@@ -98,6 +120,7 @@ public final class InicializadorSistema {
         } catch (java.io.IOException e) {
             throw new PersistenciaException("No se pudieron cargar los pasajeros iniciales: " + e.getMessage(), e);
         }
+        sembrarComplementarios(new ArrayList<>());
         return viajes;
     }
 

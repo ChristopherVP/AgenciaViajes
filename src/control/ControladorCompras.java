@@ -1,6 +1,7 @@
 package control;
 
 import excepciones.FachadaException;
+import excepciones.PersistenciaException;
 import fachadas.FachadaArchivos;
 import java.time.DateTimeException;
 import java.time.LocalDate;
@@ -222,6 +223,11 @@ public class ControladorCompras {
                 paraFactura.setNumerosAsientos(numeros);
             }
             Comprobante factura = new ControladorFacturacion().emitirPasaje(paraFactura);
+            try {
+                DatosComplementarios.registrarFacturaYPago(paraFactura);
+            } catch (PersistenciaException e) {
+                System.err.println("No se pudo guardar la factura/pago de " + reserva.getIdReserva() + ": " + e.getMessage());
+            }
             return new ResultadoOperacion(true, String.format("¡Compra exitosa! Reserva %s por $%.2f%s", reserva.getIdReserva(), reserva.getPrecioTotal(),
                     factura == null ? "" : ". Factura " + factura.getNumero()), paraFactura);
         } catch (FachadaException e) {
